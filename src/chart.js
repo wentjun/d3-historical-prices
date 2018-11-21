@@ -67,6 +67,7 @@ loadChart.then(data => {
     .domain([yMin, yMax])
     .range([height, 0]);
 
+  // generates lines when called
   const line = d3
     .line()
     .x(d => {
@@ -75,6 +76,22 @@ loadChart.then(data => {
     .y(d => {
       return yScale(d['close']);
     });
+
+  let movingSum;
+  const movingAverageLine = d3
+    .line()
+    .x(d => {
+      return xScale(d['date']);
+    })
+    .y((d, i) => {
+      if (i == 0) {
+        return (movingSum = 0);
+      } else {
+        movingSum += d['close'];
+      }
+      return yScale(movingSum / i);
+    })
+    .curve(d3.curveBasis);
 
   // add chart SVG to the page
   const svg = d3
@@ -92,11 +109,18 @@ loadChart.then(data => {
     .call(d3.axisBottom(xScale));
   svg.append('g').call(d3.axisLeft(yScale));
 
-  // render line
+  // render lines
   svg
     .append('path')
     .datum(data) // binds data to the line
     .style('fill', 'none')
     .attr('stroke', 'red')
     .attr('d', line);
+
+  svg
+    .append('path')
+    .datum(data)
+    .style('fill', 'none')
+    .attr('stroke', 'purple')
+    .attr('d', movingAverageLine);
 });

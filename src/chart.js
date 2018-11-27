@@ -100,16 +100,17 @@ loadChart.then(data => {
     .attr('width', width + margin.left + margin.right)
     .attr('height', height + margin.top + margin.bottom)
     .append('g')
-    .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+    .attr('transform', `translate(${margin.left}, ${margin.top})`);
 
   // create an axes components
   svg
     .append('g')
-    .attr('transform', 'translate(0,' + height + ')')
+    .attr('transform', `translate(0, ${height})`)
     .call(d3.axisBottom(xScale));
+
   svg
     .append('g')
-    .attr('transform', 'translate( ' + width + ', 0 )')
+    .attr('transform', `translate(${width}, 0)`)
     .call(d3.axisRight(yScale));
 
   // render lines
@@ -165,18 +166,22 @@ loadChart.then(data => {
 
   const bisectDate = d3.bisector(d => d.date).left;
 
+  /* mouseover function to generate crosshair */
   function mousemove() {
     const x0 = xScale.invert(d3.mouse(this)[0]);
     const i = bisectDate(data, x0, 1);
     const d0 = data[i - 1];
     const d1 = data[i];
-    const d = x0 - d0.date > d1.date - x0 ? d1 : d0;
-    focus.attr('transform', `translate(${xScale(d.date)}, ${yScale(d.close)})`);
+    const d = x0 - d0['date'] > d1['date'] - x0 ? d1 : d0;
+    focus.attr(
+      'transform',
+      `translate(${xScale(d['date'])}, ${yScale(d['close'])})`
+    );
 
     focus
       .select('line.x')
       .attr('x1', 0)
-      .attr('x2', width - xScale(d.date))
+      .attr('x2', width - xScale(d['date']))
       .attr('y1', 0)
       .attr('y2', 0);
 
@@ -185,8 +190,8 @@ loadChart.then(data => {
       .attr('x1', 0)
       .attr('x2', 0)
       .attr('y1', 0)
-      .attr('y2', height - yScale(d.close));
+      .attr('y2', height - yScale(d['close']));
 
-    focus.select('text').text(d.close);
+    focus.select('text').text(d['close']);
   }
 });

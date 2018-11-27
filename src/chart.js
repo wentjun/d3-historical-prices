@@ -193,5 +193,28 @@ loadChart.then(data => {
       .attr('y2', height - yScale(d['close']));
 
     focus.select('text').text(d['close']);
+    updateLegends(d);
   }
+
+  /* Legends */
+  const updateLegends = currentData => {
+    d3.selectAll('.lineLegend').remove();
+
+    const legendKeys = Object.keys(data[0]);
+    var lineLegend = svg
+      .selectAll('.lineLegend')
+      .data(legendKeys)
+      .enter()
+      .append('g')
+      .attr('class', 'lineLegend')
+      .attr('transform', function(d, i) {
+        return `translate(0, ${i * 20})`;
+      });
+    lineLegend
+      .append('text')
+      .text(d => {
+        return `${d}: ${currentData[d]}`;
+      })
+      .attr('transform', 'translate(15,9)'); //align texts with boxes
+  };
 });

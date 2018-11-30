@@ -219,20 +219,7 @@ loadChart.then(data => {
   };
 
   /* Volume series bars */
-  const volData = data
-    .filter(d => d['volume'] !== null && d['volume'] !== 0)
-    .filter(function(v, i) {
-      // check the index is odd
-      return i % 2 == 0;
-    })
-    .filter(function(v, i) {
-      // check the index is odd
-      return i % 2 == 0;
-    })
-    .filter(function(v, i) {
-      // check the index is odd
-      return i % 2 == 0;
-    });
+  const volData = data.filter(d => d['volume'] !== null && d['volume'] !== 0);
 
   const yMinVolume = d3.min(volData, d => {
     return Math.min(d['volume']);
@@ -258,15 +245,14 @@ loadChart.then(data => {
     .attr('y', function(d) {
       return yVolumeScale(d['volume']);
     })
-    .attr('fill', d => (d.open > d.close ? 'red' : 'green')) // green bar if price is rising during that period, and red when price is falling
+    .attr('fill', d => (d.open > d.close ? 'red' : 'green')) // green bar if price is rising during that period, and red when price  is falling
     .attr('width', 1)
     .attr('height', function(d) {
       return height - yVolumeScale(d['volume']);
     });
-  /*
+
   // testing axis for volume
-  svg
-    .append('g')
-    .call(d3.axisLeft(yVolumeScale));
-    */
+  /*
+  svg.append('g').call(d3.axisLeft(yVolumeScale));
+  */
 });

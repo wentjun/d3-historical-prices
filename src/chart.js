@@ -1,4 +1,3 @@
-/*
 const loadJson = (file, callback) => {
   const xobj = new XMLHttpRequest();
   xobj.overrideMimeType('application/json');
@@ -11,14 +10,14 @@ const loadJson = (file, callback) => {
   };
   xobj.send(null);
 };
-
-loadJson('./sti-full.json', text => {
+/*
+const getData = loadJson('./sti-full.json', text => {
   const data = JSON.parse(text);
   console.log(data);
 });
 */
 
-const loadChart = d3.json('sti-full.json').then(data => {
+const loadData = d3.json('sti-full.json').then(data => {
   const chartResultsData = data['chart']['result'][0];
   const quoteData = chartResultsData['indicators']['quote'][0];
 
@@ -32,7 +31,11 @@ const loadChart = d3.json('sti-full.json').then(data => {
   }));
 });
 
-loadChart.then(data => {
+loadData.then(data => {
+  renderChart(data);
+});
+
+const renderChart = data => {
   console.log(data);
   const margin = { top: 50, right: 50, bottom: 50, left: 50 };
   const width = window.innerWidth - margin.left - margin.right; // Use the window's width
@@ -255,4 +258,20 @@ loadChart.then(data => {
   /*
   svg.append('g').call(d3.axisLeft(yVolumeScale));
   */
-});
+};
+const setOneYear = () => {
+  loadData.then(data => {
+    const thisYearStartDateEpoch = new Date(
+      new Date().getFullYear(),
+      0,
+      1
+    ).valueOf();
+    console.log(thisYearStartDateEpoch);
+    data.map(row => (row['date'] = Math.floor(row['date'].getTime())));
+    const res = data.filter(row => {
+      if (row['date']) {
+        return row['date'] >= thisYearStartDateEpoch;
+      }
+    });
+  });
+};

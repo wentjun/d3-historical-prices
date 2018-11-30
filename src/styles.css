@@ -1,0 +1,27 @@
+.flex-container {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+
+  display: -webkit-box;
+  display: -moz-box;
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex;
+
+  -webkit-flex-flow: row wrap;
+  justify-content: flex-start;
+}
+
+.flex-item {
+  background: tomato;
+  padding: 5px;
+  width: 10vw;
+  height: 5vh;
+  margin-top: 10px;
+
+  color: white;
+  font-weight: bold;
+  font-size: 1em;
+  text-align: center;
+}

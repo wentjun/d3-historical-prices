@@ -118,7 +118,7 @@ loadChart.then(data => {
     .append('path')
     .datum(data) // binds data to the line
     .style('fill', 'none')
-    .attr('stroke', 'red')
+    .attr('stroke', 'steelblue')
     .attr('d', line);
 
   svg
@@ -217,4 +217,42 @@ loadChart.then(data => {
       })
       .attr('transform', 'translate(15,9)'); //align texts with boxes
   };
+
+  /* Volume series bars */
+  const volData = data.filter(d => d['volume'] !== null && d['volume'] !== 0);
+
+  const yMinVolume = d3.min(volData, d => {
+    return Math.min(d['volume']);
+  });
+
+  const yMaxVolume = d3.max(volData, d => {
+    return Math.max(d['volume']);
+  });
+
+  const yVolumeScale = d3
+    .scaleLinear()
+    .domain([yMinVolume, yMaxVolume])
+    .range([height, 0]);
+
+  svg
+    .selectAll()
+    .data(volData)
+    .enter()
+    .append('rect')
+    .attr('x', d => {
+      return xScale(d['date']);
+    })
+    .attr('y', function(d) {
+      return yVolumeScale(d['volume']);
+    })
+    .attr('fill', d => (d.open > d.close ? 'red' : 'green')) // green bar if price is rising during that period, and red when price  is falling
+    .attr('width', 1)
+    .attr('height', function(d) {
+      return height - yVolumeScale(d['volume']);
+    });
+
+  // testing axis for volume
+  /*
+  svg.append('g').call(d3.axisLeft(yVolumeScale));
+  */
 });

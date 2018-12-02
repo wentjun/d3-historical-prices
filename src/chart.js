@@ -32,10 +32,10 @@ const loadData = d3.json('sti-full.json').then(data => {
 });
 
 loadData.then(data => {
-  renderChart(data);
+  initialiseChart(data);
 });
 
-const renderChart = data => {
+const initialiseChart = data => {
   console.log(data);
   const margin = { top: 50, right: 50, bottom: 50, left: 50 };
   const width = window.innerWidth - margin.left - margin.right; // Use the window's width
@@ -262,6 +262,68 @@ const renderChart = data => {
   svg.append('g').call(d3.axisLeft(yVolumeScale));
   */
 };
+
+const renderChart = data => {
+  const margin = { top: 50, right: 50, bottom: 50, left: 50 };
+  const width = window.innerWidth - margin.left - margin.right; // Use the window's width
+  const height = window.innerHeight - margin.top - margin.bottom; // Use the window's height
+  const timeFormat = d3.timeFormat('%I:%M %p %a %Y');
+
+  // find data range
+  const xMin = d3.min(data, d => {
+    return Math.min(d['date']);
+  });
+
+  const xMax = d3.max(data, d => {
+    return Math.max(d['date']);
+  });
+
+  const yMin = d3.min(data, d => {
+    return Math.min(d['close']);
+  });
+
+  const yMax = d3.max(data, d => {
+    return Math.max(d['close']);
+  });
+
+  // scale using range
+  const xScale = d3
+    .scaleTime()
+    .domain([xMin, xMax])
+    .range([0, width]);
+
+  const yScale = d3
+    .scaleLinear()
+    .domain([yMin, yMax])
+    .range([height, 0]);
+
+  // generates lines when called
+  const line = d3
+    .line()
+    .x(d => {
+      return xScale(d['date']);
+    })
+    .y(d => {
+      return yScale(d['close']);
+    });
+
+  let movingSum;
+  const movingAverageLine = d3
+    .line()
+    .x(d => {
+      return xScale(d['date']);
+    })
+    .y((d, i) => {
+      if (i == 0) {
+        return (movingSum = 0);
+      } else {
+        movingSum += d['close'];
+      }
+      return yScale(movingSum / i);
+    })
+    .curve(d3.curveBasis);
+};
+
 const setOneYear = () => {
   loadData.then(data => {
     const thisYearStartDateEpoch = new Date(
@@ -276,8 +338,6 @@ const setOneYear = () => {
       }
     });
     res.map(row => (row['date'] = new Date(row['date'])));
-    console.log(res);
-    const t = d3.transition().duration(750);
 
     // find data range
     const margin = { top: 50, right: 50, bottom: 50, left: 50 };
@@ -346,5 +406,43 @@ const setOneYear = () => {
 
     d3.selectAll('#xAxis').call(d3.axisBottom(xScale));
     d3.selectAll('#yAxis').call(d3.axisRight(yScale));
+
+    var chart = d3.select('#chart');
+    const t = d3.transition().duration(750);
+    const volData = res.filter(d => d['volume'] !== null && d['volume'] !== 0);
+
+    const yMinVolume = d3.min(volData, d => {
+      return Math.min(d['volume']);
+    });
+
+    const yMaxVolume = d3.max(volData, d => {
+      return Math.max(d['volume']);
+    });
+
+    const yVolumeScale = d3
+      .scaleLinear()
+      .domain([yMinVolume, yMaxVolume])
+      .range([height, 0]);
+
+    //select
+    const bars = chart.selectAll('rect').data(res);
+    //enter
+    bars.enter().append('rect');
+    //exit
+    bars.exit().remove();
+    //update
+    bars
+      .transition(t)
+      .attr('x', d => {
+        return xScale(d['date']);
+      })
+      .attr('y', function(d) {
+        return yVolumeScale(d['volume']);
+      })
+      .attr('fill', d => (d.open > d.close ? 'red' : 'green')) // green bar if price is rising during that period, and red when price  is falling
+      .attr('width', 1)
+      .attr('height', function(d) {
+        return height - yVolumeScale(d['volume']);
+      });
   });
 };

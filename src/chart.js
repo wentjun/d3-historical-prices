@@ -108,26 +108,30 @@ const renderChart = data => {
   // create an axes components
   svg
     .append('g')
+    .attr('id', 'xAxis')
     .attr('transform', `translate(0, ${height})`)
     .call(d3.axisBottom(xScale));
 
   svg
     .append('g')
+    .attr('id', 'yAxis')
     .attr('transform', `translate(${width}, 0)`)
     .call(d3.axisRight(yScale));
 
   // render lines
   svg
     .append('path')
-    .datum(data) // binds data to the line
+    .data([data]) // binds data to the line
     .style('fill', 'none')
+    .attr('id', 'priceChart')
     .attr('stroke', 'steelblue')
     .attr('d', line);
 
   svg
     .append('path')
-    .datum(data)
+    .data([data])
     .style('fill', 'none')
+    .attr('id', 'movingAverageLine')
     .attr('stroke', 'purple')
     .attr('d', movingAverageLine);
 
@@ -253,7 +257,6 @@ const renderChart = data => {
     .attr('height', function(d) {
       return height - yVolumeScale(d['volume']);
     });
-
   // testing axis for volume
   /*
   svg.append('g').call(d3.axisLeft(yVolumeScale));
@@ -266,12 +269,82 @@ const setOneYear = () => {
       0,
       1
     ).valueOf();
-    console.log(thisYearStartDateEpoch);
     data.map(row => (row['date'] = Math.floor(row['date'].getTime())));
     const res = data.filter(row => {
       if (row['date']) {
         return row['date'] >= thisYearStartDateEpoch;
       }
     });
+    res.map(row => (row['date'] = new Date(row['date'])));
+    console.log(res);
+    const t = d3.transition().duration(750);
+
+    // find data range
+    const margin = { top: 50, right: 50, bottom: 50, left: 50 };
+    const width = window.innerWidth - margin.left - margin.right; // Use the window's width
+    const height = window.innerHeight - margin.top - margin.bottom; // Use the window's height
+    const xMin = d3.min(res, d => {
+      return Math.min(d['date']);
+    });
+
+    const xMax = d3.max(res, d => {
+      return Math.max(d['date']);
+    });
+
+    const yMin = d3.min(res, d => {
+      return Math.min(d['close']);
+    });
+
+    const yMax = d3.max(res, d => {
+      return Math.max(d['close']);
+    });
+
+    const xScale = d3
+      .scaleTime()
+      .domain([xMin, xMax])
+      .range([0, width]);
+
+    const yScale = d3
+      .scaleLinear()
+      .domain([yMin, yMax])
+      .range([height, 0]);
+
+    const line = d3
+      .line()
+      .x(d => {
+        return xScale(d['date']);
+      })
+      .y(d => {
+        return yScale(d['close']);
+      });
+
+    const movingAverageLine = d3
+      .line()
+      .x(d => {
+        return xScale(d['date']);
+      })
+      .y((d, i) => {
+        if (i == 0) {
+          return (movingSum = 0);
+        } else {
+          movingSum += d['close'];
+        }
+        return yScale(movingSum / i);
+      })
+      .curve(d3.curveBasis);
+
+    const svg = d3.select('#chart').transition();
+
+    svg
+      .select('#priceChart') // change the line
+      .duration(750)
+      .attr('d', line(res));
+    svg
+      .select('#movingAverageLine') // change the line
+      .duration(750)
+      .attr('d', movingAverageLine(res));
+
+    d3.selectAll('#xAxis').call(d3.axisBottom(xScale));
+    d3.selectAll('#yAxis').call(d3.axisRight(yScale));
   });
 };

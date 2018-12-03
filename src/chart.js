@@ -132,7 +132,7 @@ const initialiseChart = data => {
     .data([data])
     .style('fill', 'none')
     .attr('id', 'movingAverageLine')
-    .attr('stroke', 'purple')
+    .attr('stroke', '#FF8900')
     .attr('d', movingAverageLine);
 
   // renders x and y crosshair
@@ -164,10 +164,8 @@ const initialiseChart = data => {
   d3.select('.overlay').style('fill', 'none');
   d3.select('.overlay').style('pointer-events', 'all');
 
-  d3.selectAll('.focus').style('opacity', 0.7);
-
   d3.selectAll('.focus line').style('fill', 'none');
-  d3.selectAll('.focus line').style('stroke', 'black');
+  d3.selectAll('.focus line').style('stroke', '#67809f');
   d3.selectAll('.focus line').style('stroke-width', '1.5px');
   d3.selectAll('.focus line').style('stroke-dasharray', '3 3');
 
@@ -199,7 +197,6 @@ const initialiseChart = data => {
       .attr('y1', 0)
       .attr('y2', height - yScale(d['close']));
 
-    focus.select('text').text(d['close']);
     updateLegends(d);
   }
 
@@ -222,6 +219,7 @@ const initialiseChart = data => {
       .text(d => {
         return `${d}: ${currentData[d]}`;
       })
+      .style('fill', 'white')
       .attr('transform', 'translate(15,9)'); //align texts with boxes
   };
 
@@ -253,7 +251,7 @@ const initialiseChart = data => {
       return yVolumeScale(d['volume']);
     })
     .attr('class', 'vol')
-    .attr('fill', d => (d.open > d.close ? 'red' : 'green')) // green bar if price is rising during that period, and red when price  is falling
+    .attr('fill', d => (d.open > d.close ? '#c0392b' : '#03a678')) // green bar if price is rising during that period, and red when price  is falling
     .attr('width', 1)
     .attr('height', function(d) {
       return height - yVolumeScale(d['volume']);
@@ -438,7 +436,7 @@ const setPeriodFilter = filter => {
       .attr('y', function(d) {
         return yVolumeScale(d['volume']);
       })
-      .attr('fill', d => (d.open > d.close ? 'red' : 'green')) // green bar if price is rising during that period, and red when price  is falling
+      .attr('fill', d => (d.open > d.close ? '#c0392b' : '#03a678')) // green bar if price is rising during that period, and red when price  is falling
       .attr('width', 1)
       .attr('height', function(d) {
         return height - yVolumeScale(d['volume']);
@@ -454,7 +452,7 @@ const setPeriodFilter = filter => {
       .attr('y', function(d) {
         return yVolumeScale(d['volume']);
       })
-      .attr('fill', d => (d.open > d.close ? 'red' : 'green')) // green bar if price is rising during that period, and red when price  is falling
+      .attr('fill', d => (d.open > d.close ? '#c0392b' : '#03a678')) // green bar if price is rising during that period, and red when price  is falling
       .attr('width', 1)
       .attr('height', function(d) {
         return height - yVolumeScale(d['volume']);
@@ -506,7 +504,6 @@ const setPeriodFilter = filter => {
         .attr('y1', 0)
         .attr('y2', height - yScale(d['close']));
 
-      focus.select('text').text(d['close']);
       updateLegends(d);
     }
 
@@ -530,6 +527,7 @@ const setPeriodFilter = filter => {
         .text(d => {
           return `${d}: ${currentData[d]}`;
         })
+        .style('fill', 'white')
         .attr('transform', 'translate(15,9)'); //align texts with boxes
     };
   });

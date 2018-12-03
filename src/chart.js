@@ -252,6 +252,7 @@ const initialiseChart = data => {
     .attr('y', function(d) {
       return yVolumeScale(d['volume']);
     })
+    .attr('class', 'vol')
     .attr('fill', d => (d.open > d.close ? 'red' : 'green')) // green bar if price is rising during that period, and red when price  is falling
     .attr('width', 1)
     .attr('height', function(d) {
@@ -425,12 +426,13 @@ const setOneYear = () => {
       .range([height, 0]);
 
     //select
-    const bars = chart.selectAll('rect').data(res);
+    const bars = chart.selectAll('.vol').data(res);
     //enter
     bars.enter().append('rect');
     //exit
     bars.exit().remove();
     //update
+
     bars
       .transition(t)
       .attr('x', d => {
@@ -441,8 +443,79 @@ const setOneYear = () => {
       })
       .attr('fill', d => (d.open > d.close ? 'red' : 'green')) // green bar if price is rising during that period, and red when price  is falling
       .attr('width', 1)
+      .attr('transform', `translate(0, 0)`)
       .attr('height', function(d) {
         return height - yVolumeScale(d['volume']);
       });
+
+    const overlay = chart.selectAll('.overlay').data(res);
+
+    overlay.enter();
+
+    overlay.exit().remove();
+
+    overlay
+      .attr('class', 'overlay')
+      .attr('width', width)
+      .attr('height', height)
+      .on('mouseover', () => focus.style('display', null))
+      .on('mouseout', () => focus.style('display', 'none'))
+      .on('mousemove', mousemove);
+
+    const focus = d3.select('.focus');
+    const bisectDate = d3.bisector(d => d.date).left;
+
+    /* mouseover function to generate crosshair */
+    function mousemove() {
+      const x0 = xScale.invert(d3.mouse(this)[0]);
+      const i = bisectDate(res, x0, 1);
+      const d0 = res[i - 1];
+      const d1 = res[i];
+      const d = x0 - d0['date'] > d1['date'] - x0 ? d1 : d0;
+      focus.attr(
+        'transform',
+        `translate(${xScale(d['date'])}, ${yScale(d['close'])})`
+      );
+
+      focus
+        .select('line.x')
+        .attr('x1', 0)
+        .attr('x2', width - xScale(d['date']))
+        .attr('y1', 0)
+        .attr('y2', 0);
+
+      focus
+        .select('line.y')
+        .attr('x1', 0)
+        .attr('x2', 0)
+        .attr('y1', 0)
+        .attr('y2', height - yScale(d['close']));
+
+      focus.select('text').text(d['close']);
+      updateLegends(d);
+    }
+
+    const updateLegends = currentData => {
+      d3.selectAll('.lineLegend').remove();
+
+      const legendKeys = Object.keys(res[0]);
+      var lineLegend = d3
+        .select('#chart')
+        .select('g')
+        .selectAll('.lineLegend')
+        .data(legendKeys)
+        .enter()
+        .append('g')
+        .attr('class', 'lineLegend')
+        .attr('transform', function(d, i) {
+          return `translate(0, ${i * 20})`;
+        });
+      lineLegend
+        .append('text')
+        .text(d => {
+          return `${d}: ${currentData[d]}`;
+        })
+        .attr('transform', 'translate(15,9)'); //align texts with boxes
+    };
   });
 };

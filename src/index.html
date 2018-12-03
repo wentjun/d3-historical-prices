@@ -6,9 +6,10 @@
 </head>
 <body>
 <div id="chart"></div>
-<ul class="flex-container">
-  <li class="flex-item" onclick="setOneYear()">1</li>
 
-</ul>
+<select onchange="setPeriodFilter(this)">
+  <option selected="selected" value="">All</option>
+  <option value="1">This year</option>
+</select>
 <script src="chart.js"></script>
 </body>

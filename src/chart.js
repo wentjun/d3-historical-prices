@@ -325,22 +325,21 @@ const renderChart = data => {
     .curve(d3.curveBasis);
 };
 
-const setOneYear = () => {
+const setPeriodFilter = filter => {
   loadData.then(data => {
-    const thisYearStartDateEpoch = new Date(
-      new Date().getFullYear(),
-      0,
-      1
-    ).valueOf();
-    data.map(row => (row['date'] = Math.floor(row['date'].getTime())));
+    let thisYearStartDate;
+    if (filter.value === '') {
+      thisYearStartDate = null;
+    } else if (filter.value === '1') {
+      thisYearStartDate = new Date(new Date().getFullYear(), 0, 1);
+    }
+    // filter out data
     const res = data.filter(row => {
       if (row['date']) {
-        return row['date'] >= thisYearStartDateEpoch;
+        return row['date'] >= thisYearStartDate;
       }
     });
-    res.map(row => (row['date'] = new Date(row['date'])));
 
-    // find data range
     const margin = { top: 50, right: 50, bottom: 50, left: 50 };
     const width = window.innerWidth - margin.left - margin.right; // Use the window's width
     const height = window.innerHeight - margin.top - margin.bottom; // Use the window's height
@@ -396,21 +395,22 @@ const setOneYear = () => {
 
     const svg = d3.select('#chart').transition();
 
+    // update line
     svg
-      .select('#priceChart') // change the line
+      .select('#priceChart')
       .duration(750)
       .attr('d', line(res));
     svg
-      .select('#movingAverageLine') // change the line
+      .select('#movingAverageLine')
       .duration(750)
       .attr('d', movingAverageLine(res));
 
     d3.selectAll('#xAxis').call(d3.axisBottom(xScale));
     d3.selectAll('#yAxis').call(d3.axisRight(yScale));
 
-    var chart = d3.select('#chart');
+    const chart = d3.select('#chart').select('g');
     const t = d3.transition().duration(750);
-    const volData = res.filter(d => d['volume'] !== null && d['volume'] !== 0);
+    const volData = res;
 
     const yMinVolume = d3.min(volData, d => {
       return Math.min(d['volume']);
@@ -427,12 +427,9 @@ const setOneYear = () => {
 
     //select
     const bars = chart.selectAll('.vol').data(res);
-    //enter
-    bars.enter().append('rect');
-    //exit
+    //remove unused bars
     bars.exit().remove();
-    //update
-
+    //update existing bars
     bars
       .transition(t)
       .attr('x', d => {
@@ -443,17 +440,35 @@ const setOneYear = () => {
       })
       .attr('fill', d => (d.open > d.close ? 'red' : 'green')) // green bar if price is rising during that period, and red when price  is falling
       .attr('width', 1)
-      .attr('transform', `translate(0, 0)`)
+      .attr('height', function(d) {
+        return height - yVolumeScale(d['volume']);
+      });
+    //add new bars
+    bars
+      .enter()
+      .append('rect')
+      .attr('class', 'vol')
+      .attr('x', d => {
+        return xScale(d['date']);
+      })
+      .attr('y', function(d) {
+        return yVolumeScale(d['volume']);
+      })
+      .attr('fill', d => (d.open > d.close ? 'red' : 'green')) // green bar if price is rising during that period, and red when price  is falling
+      .attr('width', 1)
       .attr('height', function(d) {
         return height - yVolumeScale(d['volume']);
       });
 
+    //select
     const overlay = chart.selectAll('.overlay').data(res);
-
-    overlay.enter();
-
+    //remove old crosshair
     overlay.exit().remove();
 
+    //add crosshair
+    overlay.enter();
+
+    //update crosshair
     overlay
       .attr('class', 'overlay')
       .attr('width', width)

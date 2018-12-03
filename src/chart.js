@@ -1,4 +1,3 @@
-/*
 const loadJson = (file, callback) => {
   const xobj = new XMLHttpRequest();
   xobj.overrideMimeType('application/json');
@@ -11,14 +10,14 @@ const loadJson = (file, callback) => {
   };
   xobj.send(null);
 };
-
-loadJson('./sti-full.json', text => {
+/*
+const getData = loadJson('./sti-full.json', text => {
   const data = JSON.parse(text);
   console.log(data);
 });
 */
 
-const loadChart = d3.json('sti-full.json').then(data => {
+const loadData = d3.json('sti-full.json').then(data => {
   const chartResultsData = data['chart']['result'][0];
   const quoteData = chartResultsData['indicators']['quote'][0];
 
@@ -32,7 +31,11 @@ const loadChart = d3.json('sti-full.json').then(data => {
   }));
 });
 
-loadChart.then(data => {
+loadData.then(data => {
+  initialiseChart(data);
+});
+
+const initialiseChart = data => {
   console.log(data);
   const margin = { top: 50, right: 50, bottom: 50, left: 50 };
   const width = window.innerWidth - margin.left - margin.right; // Use the window's width
@@ -105,27 +108,31 @@ loadChart.then(data => {
   // create an axes components
   svg
     .append('g')
+    .attr('id', 'xAxis')
     .attr('transform', `translate(0, ${height})`)
     .call(d3.axisBottom(xScale));
 
   svg
     .append('g')
+    .attr('id', 'yAxis')
     .attr('transform', `translate(${width}, 0)`)
     .call(d3.axisRight(yScale));
 
   // render lines
   svg
     .append('path')
-    .datum(data) // binds data to the line
+    .data([data]) // binds data to the line
     .style('fill', 'none')
+    .attr('id', 'priceChart')
     .attr('stroke', 'steelblue')
     .attr('d', line);
 
   svg
     .append('path')
-    .datum(data)
+    .data([data])
     .style('fill', 'none')
-    .attr('stroke', 'purple')
+    .attr('id', 'movingAverageLine')
+    .attr('stroke', '#FF8900')
     .attr('d', movingAverageLine);
 
   // renders x and y crosshair
@@ -157,10 +164,8 @@ loadChart.then(data => {
   d3.select('.overlay').style('fill', 'none');
   d3.select('.overlay').style('pointer-events', 'all');
 
-  d3.selectAll('.focus').style('opacity', 0.7);
-
   d3.selectAll('.focus line').style('fill', 'none');
-  d3.selectAll('.focus line').style('stroke', 'black');
+  d3.selectAll('.focus line').style('stroke', '#67809f');
   d3.selectAll('.focus line').style('stroke-width', '1.5px');
   d3.selectAll('.focus line').style('stroke-dasharray', '3 3');
 
@@ -192,7 +197,6 @@ loadChart.then(data => {
       .attr('y1', 0)
       .attr('y2', height - yScale(d['close']));
 
-    focus.select('text').text(d['close']);
     updateLegends(d);
   }
 
@@ -215,6 +219,7 @@ loadChart.then(data => {
       .text(d => {
         return `${d}: ${currentData[d]}`;
       })
+      .style('fill', 'white')
       .attr('transform', 'translate(15,9)'); //align texts with boxes
   };
 
@@ -245,14 +250,285 @@ loadChart.then(data => {
     .attr('y', function(d) {
       return yVolumeScale(d['volume']);
     })
-    .attr('fill', d => (d.open > d.close ? 'red' : 'green')) // green bar if price is rising during that period, and red when price  is falling
+    .attr('class', 'vol')
+    .attr('fill', d => (d.open > d.close ? '#c0392b' : '#03a678')) // green bar if price is rising during that period, and red when price  is falling
     .attr('width', 1)
     .attr('height', function(d) {
       return height - yVolumeScale(d['volume']);
     });
-
   // testing axis for volume
   /*
   svg.append('g').call(d3.axisLeft(yVolumeScale));
   */
-});
+};
+
+const renderChart = data => {
+  const margin = { top: 50, right: 50, bottom: 50, left: 50 };
+  const width = window.innerWidth - margin.left - margin.right; // Use the window's width
+  const height = window.innerHeight - margin.top - margin.bottom; // Use the window's height
+  const timeFormat = d3.timeFormat('%I:%M %p %a %Y');
+
+  // find data range
+  const xMin = d3.min(data, d => {
+    return Math.min(d['date']);
+  });
+
+  const xMax = d3.max(data, d => {
+    return Math.max(d['date']);
+  });
+
+  const yMin = d3.min(data, d => {
+    return Math.min(d['close']);
+  });
+
+  const yMax = d3.max(data, d => {
+    return Math.max(d['close']);
+  });
+
+  // scale using range
+  const xScale = d3
+    .scaleTime()
+    .domain([xMin, xMax])
+    .range([0, width]);
+
+  const yScale = d3
+    .scaleLinear()
+    .domain([yMin, yMax])
+    .range([height, 0]);
+
+  // generates lines when called
+  const line = d3
+    .line()
+    .x(d => {
+      return xScale(d['date']);
+    })
+    .y(d => {
+      return yScale(d['close']);
+    });
+
+  let movingSum;
+  const movingAverageLine = d3
+    .line()
+    .x(d => {
+      return xScale(d['date']);
+    })
+    .y((d, i) => {
+      if (i == 0) {
+        return (movingSum = 0);
+      } else {
+        movingSum += d['close'];
+      }
+      return yScale(movingSum / i);
+    })
+    .curve(d3.curveBasis);
+};
+
+const setPeriodFilter = filter => {
+  loadData.then(data => {
+    let thisYearStartDate;
+    if (filter.value === '') {
+      thisYearStartDate = null;
+    } else if (filter.value === '1') {
+      thisYearStartDate = new Date(new Date().getFullYear(), 0, 1);
+    }
+    // filter out data
+    const res = data.filter(row => {
+      if (row['date']) {
+        return row['date'] >= thisYearStartDate;
+      }
+    });
+
+    const margin = { top: 50, right: 50, bottom: 50, left: 50 };
+    const width = window.innerWidth - margin.left - margin.right; // Use the window's width
+    const height = window.innerHeight - margin.top - margin.bottom; // Use the window's height
+    const xMin = d3.min(res, d => {
+      return Math.min(d['date']);
+    });
+
+    const xMax = d3.max(res, d => {
+      return Math.max(d['date']);
+    });
+
+    const yMin = d3.min(res, d => {
+      return Math.min(d['close']);
+    });
+
+    const yMax = d3.max(res, d => {
+      return Math.max(d['close']);
+    });
+
+    const xScale = d3
+      .scaleTime()
+      .domain([xMin, xMax])
+      .range([0, width]);
+
+    const yScale = d3
+      .scaleLinear()
+      .domain([yMin, yMax])
+      .range([height, 0]);
+
+    const line = d3
+      .line()
+      .x(d => {
+        return xScale(d['date']);
+      })
+      .y(d => {
+        return yScale(d['close']);
+      });
+
+    const movingAverageLine = d3
+      .line()
+      .x(d => {
+        return xScale(d['date']);
+      })
+      .y((d, i) => {
+        if (i == 0) {
+          return (movingSum = 0);
+        } else {
+          movingSum += d['close'];
+        }
+        return yScale(movingSum / i);
+      })
+      .curve(d3.curveBasis);
+
+    const svg = d3.select('#chart').transition();
+
+    // update line
+    svg
+      .select('#priceChart')
+      .duration(750)
+      .attr('d', line(res));
+    svg
+      .select('#movingAverageLine')
+      .duration(750)
+      .attr('d', movingAverageLine(res));
+
+    d3.selectAll('#xAxis').call(d3.axisBottom(xScale));
+    d3.selectAll('#yAxis').call(d3.axisRight(yScale));
+
+    const chart = d3.select('#chart').select('g');
+    const t = d3.transition().duration(750);
+    const volData = res;
+
+    const yMinVolume = d3.min(volData, d => {
+      return Math.min(d['volume']);
+    });
+
+    const yMaxVolume = d3.max(volData, d => {
+      return Math.max(d['volume']);
+    });
+
+    const yVolumeScale = d3
+      .scaleLinear()
+      .domain([yMinVolume, yMaxVolume])
+      .range([height, 0]);
+
+    //select
+    const bars = chart.selectAll('.vol').data(res);
+    //remove unused bars
+    bars.exit().remove();
+    //update existing bars
+    bars
+      .transition(t)
+      .attr('x', d => {
+        return xScale(d['date']);
+      })
+      .attr('y', function(d) {
+        return yVolumeScale(d['volume']);
+      })
+      .attr('fill', d => (d.open > d.close ? '#c0392b' : '#03a678')) // green bar if price is rising during that period, and red when price  is falling
+      .attr('width', 1)
+      .attr('height', function(d) {
+        return height - yVolumeScale(d['volume']);
+      });
+    //add new bars
+    bars
+      .enter()
+      .append('rect')
+      .attr('class', 'vol')
+      .attr('x', d => {
+        return xScale(d['date']);
+      })
+      .attr('y', function(d) {
+        return yVolumeScale(d['volume']);
+      })
+      .attr('fill', d => (d.open > d.close ? '#c0392b' : '#03a678')) // green bar if price is rising during that period, and red when price  is falling
+      .attr('width', 1)
+      .attr('height', function(d) {
+        return height - yVolumeScale(d['volume']);
+      });
+
+    //select
+    const overlay = chart.selectAll('.overlay').data(res);
+    //remove old crosshair
+    overlay.exit().remove();
+
+    //add crosshair
+    overlay.enter();
+
+    //update crosshair
+    overlay
+      .attr('class', 'overlay')
+      .attr('width', width)
+      .attr('height', height)
+      .on('mouseover', () => focus.style('display', null))
+      .on('mouseout', () => focus.style('display', 'none'))
+      .on('mousemove', mousemove);
+
+    const focus = d3.select('.focus');
+    const bisectDate = d3.bisector(d => d.date).left;
+
+    /* mouseover function to generate crosshair */
+    function mousemove() {
+      const x0 = xScale.invert(d3.mouse(this)[0]);
+      const i = bisectDate(res, x0, 1);
+      const d0 = res[i - 1];
+      const d1 = res[i];
+      const d = x0 - d0['date'] > d1['date'] - x0 ? d1 : d0;
+      focus.attr(
+        'transform',
+        `translate(${xScale(d['date'])}, ${yScale(d['close'])})`
+      );
+
+      focus
+        .select('line.x')
+        .attr('x1', 0)
+        .attr('x2', width - xScale(d['date']))
+        .attr('y1', 0)
+        .attr('y2', 0);
+
+      focus
+        .select('line.y')
+        .attr('x1', 0)
+        .attr('x2', 0)
+        .attr('y1', 0)
+        .attr('y2', height - yScale(d['close']));
+
+      updateLegends(d);
+    }
+
+    const updateLegends = currentData => {
+      d3.selectAll('.lineLegend').remove();
+
+      const legendKeys = Object.keys(res[0]);
+      var lineLegend = d3
+        .select('#chart')
+        .select('g')
+        .selectAll('.lineLegend')
+        .data(legendKeys)
+        .enter()
+        .append('g')
+        .attr('class', 'lineLegend')
+        .attr('transform', function(d, i) {
+          return `translate(0, ${i * 20})`;
+        });
+      lineLegend
+        .append('text')
+        .text(d => {
+          return `${d}: ${currentData[d]}`;
+        })
+        .style('fill', 'white')
+        .attr('transform', 'translate(15,9)'); //align texts with boxes
+    };
+  });
+};

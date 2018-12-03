@@ -5,6 +5,10 @@
 <script src="https://d3js.org/d3.v5.min.js"></script>
 </head>
 <body>
-<div id="chart"></div>
-<script src="chart.js"></script>
+  <select onchange="setPeriodFilter(this)">
+    <option selected="selected" value="">All</option>
+    <option value="1">This year</option>
+  </select>
+  <div id="chart"></div>
+  <script src="chart.js"></script>
 </body>

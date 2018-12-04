@@ -17,6 +17,23 @@ const getData = loadJson('./sti-full.json', text => {
 });
 */
 
+const movingAverage = (data, numberOfPricePoints) => {
+  return data.map((row, index, total) => {
+    const start = Math.max(0, index - numberOfPricePoints);
+    //const end = index + numberOfPricePoints;
+    const end = index;
+    const subset = total.slice(start, end + 1);
+    const sum = subset.reduce((a, b) => {
+      return a + b.close;
+    }, 0);
+
+    return {
+      date: row['date'],
+      average: sum / subset.length
+    };
+  });
+};
+
 const loadData = d3.json('sti-full.json').then(data => {
   const chartResultsData = data['chart']['result'][0];
   const quoteData = chartResultsData['indicators']['quote'][0];
@@ -36,7 +53,19 @@ loadData.then(data => {
 });
 
 const initialiseChart = data => {
-  console.log(data);
+  data = data.filter(
+    row => row['high'] && row['low'] && row['close'] && row['open']
+  );
+
+  thisYearStartDate = new Date(new Date().getFullYear() - 2, 0, 1);
+
+  // filter out data based on time period
+  data = data.filter(row => {
+    if (row['date']) {
+      return row['date'] >= thisYearStartDate;
+    }
+  });
+
   const margin = { top: 50, right: 50, bottom: 50, left: 50 };
   const width = window.innerWidth - margin.left - margin.right; // Use the window's width
   const height = window.innerHeight - margin.top - margin.bottom; // Use the window's height
@@ -86,13 +115,8 @@ const initialiseChart = data => {
     .x(d => {
       return xScale(d['date']);
     })
-    .y((d, i) => {
-      if (i == 0) {
-        return (movingSum = 0);
-      } else {
-        movingSum += d['close'];
-      }
-      return yScale(movingSum / i);
+    .y(d => {
+      return yScale(d['average']);
     })
     .curve(d3.curveBasis);
 
@@ -127,9 +151,11 @@ const initialiseChart = data => {
     .attr('stroke', 'steelblue')
     .attr('d', line);
 
+  // calculates simple moving average over 50 days
+  const movingAverageData = movingAverage(data, 49);
   svg
     .append('path')
-    .data([data])
+    .data([movingAverageData])
     .style('fill', 'none')
     .attr('id', 'movingAverageLine')
     .attr('stroke', '#FF8900')
@@ -217,7 +243,18 @@ const initialiseChart = data => {
     lineLegend
       .append('text')
       .text(d => {
-        return `${d}: ${currentData[d]}`;
+        if (d === 'date') {
+          return `${d}: ${currentData[d].toLocaleDateString()}`;
+        } else if (
+          d === 'high' ||
+          d === 'low' ||
+          d === 'open' ||
+          d === 'close'
+        ) {
+          return `${d}: ${currentData[d].toFixed(2)}`;
+        } else {
+          return `${d}: ${currentData[d]}`;
+        }
       })
       .style('fill', 'white')
       .attr('transform', 'translate(15,9)'); //align texts with boxes
@@ -262,76 +299,18 @@ const initialiseChart = data => {
   */
 };
 
-const renderChart = data => {
-  const margin = { top: 50, right: 50, bottom: 50, left: 50 };
-  const width = window.innerWidth - margin.left - margin.right; // Use the window's width
-  const height = window.innerHeight - margin.top - margin.bottom; // Use the window's height
-  const timeFormat = d3.timeFormat('%I:%M %p %a %Y');
-
-  // find data range
-  const xMin = d3.min(data, d => {
-    return Math.min(d['date']);
-  });
-
-  const xMax = d3.max(data, d => {
-    return Math.max(d['date']);
-  });
-
-  const yMin = d3.min(data, d => {
-    return Math.min(d['close']);
-  });
-
-  const yMax = d3.max(data, d => {
-    return Math.max(d['close']);
-  });
-
-  // scale using range
-  const xScale = d3
-    .scaleTime()
-    .domain([xMin, xMax])
-    .range([0, width]);
-
-  const yScale = d3
-    .scaleLinear()
-    .domain([yMin, yMax])
-    .range([height, 0]);
-
-  // generates lines when called
-  const line = d3
-    .line()
-    .x(d => {
-      return xScale(d['date']);
-    })
-    .y(d => {
-      return yScale(d['close']);
-    });
-
-  let movingSum;
-  const movingAverageLine = d3
-    .line()
-    .x(d => {
-      return xScale(d['date']);
-    })
-    .y((d, i) => {
-      if (i == 0) {
-        return (movingSum = 0);
-      } else {
-        movingSum += d['close'];
-      }
-      return yScale(movingSum / i);
-    })
-    .curve(d3.curveBasis);
-};
-
 const setPeriodFilter = filter => {
   loadData.then(data => {
+    data = data.filter(
+      row => row['high'] && row['low'] && row['close'] && row['open']
+    );
     let thisYearStartDate;
     if (filter.value === '') {
-      thisYearStartDate = null;
+      thisYearStartDate = new Date(new Date().getFullYear() - 2, 0, 1);
     } else if (filter.value === '1') {
       thisYearStartDate = new Date(new Date().getFullYear(), 0, 1);
     }
-    // filter out data
+    // filter out data based on time period
     const res = data.filter(row => {
       if (row['date']) {
         return row['date'] >= thisYearStartDate;
@@ -381,13 +360,8 @@ const setPeriodFilter = filter => {
       .x(d => {
         return xScale(d['date']);
       })
-      .y((d, i) => {
-        if (i == 0) {
-          return (movingSum = 0);
-        } else {
-          movingSum += d['close'];
-        }
-        return yScale(movingSum / i);
+      .y(d => {
+        return yScale(d['average']);
       })
       .curve(d3.curveBasis);
 
@@ -398,10 +372,12 @@ const setPeriodFilter = filter => {
       .select('#priceChart')
       .duration(750)
       .attr('d', line(res));
+
+    const movingAverageData = movingAverage(res, 49);
     svg
       .select('#movingAverageLine')
       .duration(750)
-      .attr('d', movingAverageLine(res));
+      .attr('d', movingAverageLine(movingAverageData));
 
     d3.selectAll('#xAxis').call(d3.axisBottom(xScale));
     d3.selectAll('#yAxis').call(d3.axisRight(yScale));
@@ -525,7 +501,18 @@ const setPeriodFilter = filter => {
       lineLegend
         .append('text')
         .text(d => {
-          return `${d}: ${currentData[d]}`;
+          if (d === 'date') {
+            return `${d}: ${currentData[d].toLocaleDateString()}`;
+          } else if (
+            d === 'high' ||
+            d === 'low' ||
+            d === 'open' ||
+            d === 'close'
+          ) {
+            return `${d}: ${currentData[d].toFixed(2)}`;
+          } else {
+            return `${d}: ${currentData[d]}`;
+          }
         })
         .style('fill', 'white')
         .attr('transform', 'translate(15,9)'); //align texts with boxes

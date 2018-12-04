@@ -36,7 +36,9 @@ loadData.then(data => {
 });
 
 const initialiseChart = data => {
-  console.log(data);
+  data = data.filter(
+    row => row['high'] && row['low'] && row['close'] && row['open']
+  );
   const margin = { top: 50, right: 50, bottom: 50, left: 50 };
   const width = window.innerWidth - margin.left - margin.right; // Use the window's width
   const height = window.innerHeight - margin.top - margin.bottom; // Use the window's height
@@ -217,7 +219,18 @@ const initialiseChart = data => {
     lineLegend
       .append('text')
       .text(d => {
-        return `${d}: ${currentData[d]}`;
+        if (d === 'date') {
+          return `${d}: ${currentData[d].toLocaleDateString()}`;
+        } else if (
+          d === 'high' ||
+          d === 'low' ||
+          d === 'open' ||
+          d === 'close'
+        ) {
+          return `${d}: ${currentData[d].toFixed(2)}`;
+        } else {
+          return `${d}: ${currentData[d]}`;
+        }
       })
       .style('fill', 'white')
       .attr('transform', 'translate(15,9)'); //align texts with boxes
@@ -325,13 +338,16 @@ const renderChart = data => {
 
 const setPeriodFilter = filter => {
   loadData.then(data => {
+    data = data.filter(
+      row => row['high'] && row['low'] && row['close'] && row['open']
+    );
     let thisYearStartDate;
     if (filter.value === '') {
       thisYearStartDate = null;
     } else if (filter.value === '1') {
       thisYearStartDate = new Date(new Date().getFullYear(), 0, 1);
     }
-    // filter out data
+    // filter out data based on time period
     const res = data.filter(row => {
       if (row['date']) {
         return row['date'] >= thisYearStartDate;
@@ -525,7 +541,18 @@ const setPeriodFilter = filter => {
       lineLegend
         .append('text')
         .text(d => {
-          return `${d}: ${currentData[d]}`;
+          if (d === 'date') {
+            return `${d}: ${currentData[d].toLocaleDateString()}`;
+          } else if (
+            d === 'high' ||
+            d === 'low' ||
+            d === 'open' ||
+            d === 'close'
+          ) {
+            return `${d}: ${currentData[d].toFixed(2)}`;
+          } else {
+            return `${d}: ${currentData[d]}`;
+          }
         })
         .style('fill', 'white')
         .attr('transform', 'translate(15,9)'); //align texts with boxes

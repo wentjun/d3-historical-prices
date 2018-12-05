@@ -1,8 +1,10 @@
+/*
+// sample method to load JSON file
 const loadJson = (file, callback) => {
   const xobj = new XMLHttpRequest();
   xobj.overrideMimeType('application/json');
   xobj.open('GET', file, true);
-  xobj.onreadystatechange = function() {
+  xobj.onreadystatechange = () => {
     if (xobj.readyState == 4 && xobj.status == '200') {
       // Required use of an anonymous callback as .open will NOT return a value but simply returns undefined in asynchronous mode
       callback(xobj.responseText);
@@ -10,12 +12,26 @@ const loadJson = (file, callback) => {
   };
   xobj.send(null);
 };
-/*
-const getData = loadJson('./sti-full.json', text => {
+
+const getData = loadJson('./sample-data.json', text => {
   const data = JSON.parse(text);
   console.log(data);
 });
 */
+
+const loadData = d3.json('sample-data.json').then(data => {
+  const chartResultsData = data['chart']['result'][0];
+  const quoteData = chartResultsData['indicators']['quote'][0];
+
+  return chartResultsData['timestamp'].map((time, index) => ({
+    date: new Date(time * 1000),
+    high: quoteData['high'][index],
+    low: quoteData['low'][index],
+    open: quoteData['open'][index],
+    close: quoteData['close'][index],
+    volume: quoteData['volume'][index]
+  }));
+});
 
 const movingAverage = (data, numberOfPricePoints) => {
   return data.map((row, index, total) => {
@@ -33,20 +49,6 @@ const movingAverage = (data, numberOfPricePoints) => {
     };
   });
 };
-
-const loadData = d3.json('sti-full.json').then(data => {
-  const chartResultsData = data['chart']['result'][0];
-  const quoteData = chartResultsData['indicators']['quote'][0];
-
-  return chartResultsData['timestamp'].map((time, index) => ({
-    date: new Date(time * 1000),
-    high: quoteData['high'][index],
-    low: quoteData['low'][index],
-    open: quoteData['open'][index],
-    close: quoteData['close'][index],
-    volume: quoteData['volume'][index]
-  }));
-});
 
 loadData.then(data => {
   initialiseChart(data);
@@ -99,27 +101,6 @@ const initialiseChart = data => {
     .domain([yMin, yMax])
     .range([height, 0]);
 
-  // generates lines when called
-  const line = d3
-    .line()
-    .x(d => {
-      return xScale(d['date']);
-    })
-    .y(d => {
-      return yScale(d['close']);
-    });
-
-  let movingSum;
-  const movingAverageLine = d3
-    .line()
-    .x(d => {
-      return xScale(d['date']);
-    })
-    .y(d => {
-      return yScale(d['average']);
-    })
-    .curve(d3.curveBasis);
-
   // add chart SVG to the page
   const svg = d3
     .select('#chart')
@@ -142,7 +123,28 @@ const initialiseChart = data => {
     .attr('transform', `translate(${width}, 0)`)
     .call(d3.axisRight(yScale));
 
-  // render lines
+  // renders close price line chart and moving average line chart
+
+  // generates lines when called
+  const line = d3
+    .line()
+    .x(d => {
+      return xScale(d['date']);
+    })
+    .y(d => {
+      return yScale(d['close']);
+    });
+
+  const movingAverageLine = d3
+    .line()
+    .x(d => {
+      return xScale(d['date']);
+    })
+    .y(d => {
+      return yScale(d['average']);
+    })
+    .curve(d3.curveBasis);
+
   svg
     .append('path')
     .data([data]) // binds data to the line
@@ -168,11 +170,8 @@ const initialiseChart = data => {
     .style('display', 'none');
 
   focus.append('circle').attr('r', 4.5);
-
   focus.append('line').classed('x', true);
-
   focus.append('line').classed('y', true);
-
   focus
     .append('text')
     .attr('x', 9)
@@ -185,7 +184,7 @@ const initialiseChart = data => {
     .attr('height', height)
     .on('mouseover', () => focus.style('display', null))
     .on('mouseout', () => focus.style('display', 'none'))
-    .on('mousemove', mousemove);
+    .on('mousemove', generateCrosshair);
 
   d3.select('.overlay').style('fill', 'none');
   d3.select('.overlay').style('pointer-events', 'all');
@@ -195,24 +194,30 @@ const initialiseChart = data => {
   d3.selectAll('.focus line').style('stroke-width', '1.5px');
   d3.selectAll('.focus line').style('stroke-dasharray', '3 3');
 
+  //returs insertion point
   const bisectDate = d3.bisector(d => d.date).left;
 
   /* mouseover function to generate crosshair */
-  function mousemove() {
-    const x0 = xScale.invert(d3.mouse(this)[0]);
-    const i = bisectDate(data, x0, 1);
+  function generateCrosshair() {
+    //returns corresponding value from the domain
+    const correspondingDate = xScale.invert(d3.mouse(this)[0]);
+    //gets insertion point
+    const i = bisectDate(data, correspondingDate, 1);
     const d0 = data[i - 1];
     const d1 = data[i];
-    const d = x0 - d0['date'] > d1['date'] - x0 ? d1 : d0;
+    const currentPoint =
+      correspondingDate - d0['date'] > d1['date'] - correspondingDate ? d1 : d0;
     focus.attr(
       'transform',
-      `translate(${xScale(d['date'])}, ${yScale(d['close'])})`
+      `translate(${xScale(currentPoint['date'])}, ${yScale(
+        currentPoint['close']
+      )})`
     );
 
     focus
       .select('line.x')
       .attr('x1', 0)
-      .attr('x2', width - xScale(d['date']))
+      .attr('x2', width - xScale(currentPoint['date']))
       .attr('y1', 0)
       .attr('y2', 0);
 
@@ -221,9 +226,10 @@ const initialiseChart = data => {
       .attr('x1', 0)
       .attr('x2', 0)
       .attr('y1', 0)
-      .attr('y2', height - yScale(d['close']));
+      .attr('y2', height - yScale(currentPoint['close']));
 
-    updateLegends(d);
+    // updates the legend to display the date, open, close, high, low, and volume and selected mouseover area
+    updateLegends(currentPoint);
   }
 
   /* Legends */
@@ -231,13 +237,13 @@ const initialiseChart = data => {
     d3.selectAll('.lineLegend').remove();
 
     const legendKeys = Object.keys(data[0]);
-    var lineLegend = svg
+    const lineLegend = svg
       .selectAll('.lineLegend')
       .data(legendKeys)
       .enter()
       .append('g')
       .attr('class', 'lineLegend')
-      .attr('transform', function(d, i) {
+      .attr('transform', (d, i) => {
         return `translate(0, ${i * 20})`;
       });
     lineLegend
@@ -284,13 +290,13 @@ const initialiseChart = data => {
     .attr('x', d => {
       return xScale(d['date']);
     })
-    .attr('y', function(d) {
+    .attr('y', d => {
       return yVolumeScale(d['volume']);
     })
     .attr('class', 'vol')
     .attr('fill', d => (d.open > d.close ? '#c0392b' : '#03a678')) // green bar if price is rising during that period, and red when price  is falling
     .attr('width', 1)
-    .attr('height', function(d) {
+    .attr('height', d => {
       return height - yVolumeScale(d['volume']);
     });
   // testing axis for volume
@@ -409,12 +415,12 @@ const setPeriodFilter = filter => {
       .attr('x', d => {
         return xScale(d['date']);
       })
-      .attr('y', function(d) {
+      .attr('y', d => {
         return yVolumeScale(d['volume']);
       })
       .attr('fill', d => (d.open > d.close ? '#c0392b' : '#03a678')) // green bar if price is rising during that period, and red when price  is falling
       .attr('width', 1)
-      .attr('height', function(d) {
+      .attr('height', d => {
         return height - yVolumeScale(d['volume']);
       });
     //add new bars
@@ -425,12 +431,12 @@ const setPeriodFilter = filter => {
       .attr('x', d => {
         return xScale(d['date']);
       })
-      .attr('y', function(d) {
+      .attr('y', d => {
         return yVolumeScale(d['volume']);
       })
       .attr('fill', d => (d.open > d.close ? '#c0392b' : '#03a678')) // green bar if price is rising during that period, and red when price  is falling
       .attr('width', 1)
-      .attr('height', function(d) {
+      .attr('height', d => {
         return height - yVolumeScale(d['volume']);
       });
 
@@ -449,27 +455,34 @@ const setPeriodFilter = filter => {
       .attr('height', height)
       .on('mouseover', () => focus.style('display', null))
       .on('mouseout', () => focus.style('display', 'none'))
-      .on('mousemove', mousemove);
+      .on('mousemove', generateCrosshair);
 
     const focus = d3.select('.focus');
     const bisectDate = d3.bisector(d => d.date).left;
 
     /* mouseover function to generate crosshair */
-    function mousemove() {
-      const x0 = xScale.invert(d3.mouse(this)[0]);
-      const i = bisectDate(res, x0, 1);
-      const d0 = res[i - 1];
-      const d1 = res[i];
-      const d = x0 - d0['date'] > d1['date'] - x0 ? d1 : d0;
+    function generateCrosshair() {
+      //returns corresponding value from the domain
+      const correspondingDate = xScale.invert(d3.mouse(this)[0]);
+      //gets insertion point
+      const i = bisectDate(data, correspondingDate, 1);
+      const d0 = data[i - 1];
+      const d1 = data[i];
+      const currentPoint =
+        correspondingDate - d0['date'] > d1['date'] - correspondingDate
+          ? d1
+          : d0;
       focus.attr(
         'transform',
-        `translate(${xScale(d['date'])}, ${yScale(d['close'])})`
+        `translate(${xScale(currentPoint['date'])}, ${yScale(
+          currentPoint['close']
+        )})`
       );
 
       focus
         .select('line.x')
         .attr('x1', 0)
-        .attr('x2', width - xScale(d['date']))
+        .attr('x2', width - xScale(currentPoint['date']))
         .attr('y1', 0)
         .attr('y2', 0);
 
@@ -478,16 +491,17 @@ const setPeriodFilter = filter => {
         .attr('x1', 0)
         .attr('x2', 0)
         .attr('y1', 0)
-        .attr('y2', height - yScale(d['close']));
+        .attr('y2', height - yScale(currentPoint['close']));
 
-      updateLegends(d);
+      // updates the legend to display the date, open, close, high, low, and volume and selected mouseover area
+      updateLegends(currentPoint);
     }
 
     const updateLegends = currentData => {
       d3.selectAll('.lineLegend').remove();
 
       const legendKeys = Object.keys(res[0]);
-      var lineLegend = d3
+      const lineLegend = d3
         .select('#chart')
         .select('g')
         .selectAll('.lineLegend')
@@ -495,7 +509,7 @@ const setPeriodFilter = filter => {
         .enter()
         .append('g')
         .attr('class', 'lineLegend')
-        .attr('transform', function(d, i) {
+        .attr('transform', (d, i) => {
           return `translate(0, ${i * 20})`;
         });
       lineLegend

@@ -1,8 +1,10 @@
+/*
+// sample method to load JSON file
 const loadJson = (file, callback) => {
   const xobj = new XMLHttpRequest();
   xobj.overrideMimeType('application/json');
   xobj.open('GET', file, true);
-  xobj.onreadystatechange = function() {
+  xobj.onreadystatechange = () => {
     if (xobj.readyState == 4 && xobj.status == '200') {
       // Required use of an anonymous callback as .open will NOT return a value but simply returns undefined in asynchronous mode
       callback(xobj.responseText);
@@ -10,12 +12,26 @@ const loadJson = (file, callback) => {
   };
   xobj.send(null);
 };
-/*
+
 const getData = loadJson('./sample-data.json', text => {
   const data = JSON.parse(text);
   console.log(data);
 });
 */
+
+const loadData = d3.json('sample-data.json').then(data => {
+  const chartResultsData = data['chart']['result'][0];
+  const quoteData = chartResultsData['indicators']['quote'][0];
+
+  return chartResultsData['timestamp'].map((time, index) => ({
+    date: new Date(time * 1000),
+    high: quoteData['high'][index],
+    low: quoteData['low'][index],
+    open: quoteData['open'][index],
+    close: quoteData['close'][index],
+    volume: quoteData['volume'][index]
+  }));
+});
 
 const movingAverage = (data, numberOfPricePoints) => {
   return data.map((row, index, total) => {
@@ -33,20 +49,6 @@ const movingAverage = (data, numberOfPricePoints) => {
     };
   });
 };
-
-const loadData = d3.json('sample-data.json').then(data => {
-  const chartResultsData = data['chart']['result'][0];
-  const quoteData = chartResultsData['indicators']['quote'][0];
-
-  return chartResultsData['timestamp'].map((time, index) => ({
-    date: new Date(time * 1000),
-    high: quoteData['high'][index],
-    low: quoteData['low'][index],
-    open: quoteData['open'][index],
-    close: quoteData['close'][index],
-    volume: quoteData['volume'][index]
-  }));
-});
 
 loadData.then(data => {
   initialiseChart(data);
@@ -235,13 +237,13 @@ const initialiseChart = data => {
     d3.selectAll('.lineLegend').remove();
 
     const legendKeys = Object.keys(data[0]);
-    var lineLegend = svg
+    const lineLegend = svg
       .selectAll('.lineLegend')
       .data(legendKeys)
       .enter()
       .append('g')
       .attr('class', 'lineLegend')
-      .attr('transform', function(d, i) {
+      .attr('transform', (d, i) => {
         return `translate(0, ${i * 20})`;
       });
     lineLegend
@@ -288,13 +290,13 @@ const initialiseChart = data => {
     .attr('x', d => {
       return xScale(d['date']);
     })
-    .attr('y', function(d) {
+    .attr('y', d => {
       return yVolumeScale(d['volume']);
     })
     .attr('class', 'vol')
     .attr('fill', d => (d.open > d.close ? '#c0392b' : '#03a678')) // green bar if price is rising during that period, and red when price  is falling
     .attr('width', 1)
-    .attr('height', function(d) {
+    .attr('height', d => {
       return height - yVolumeScale(d['volume']);
     });
   // testing axis for volume
@@ -413,12 +415,12 @@ const setPeriodFilter = filter => {
       .attr('x', d => {
         return xScale(d['date']);
       })
-      .attr('y', function(d) {
+      .attr('y', d => {
         return yVolumeScale(d['volume']);
       })
       .attr('fill', d => (d.open > d.close ? '#c0392b' : '#03a678')) // green bar if price is rising during that period, and red when price  is falling
       .attr('width', 1)
-      .attr('height', function(d) {
+      .attr('height', d => {
         return height - yVolumeScale(d['volume']);
       });
     //add new bars
@@ -429,12 +431,12 @@ const setPeriodFilter = filter => {
       .attr('x', d => {
         return xScale(d['date']);
       })
-      .attr('y', function(d) {
+      .attr('y', d => {
         return yVolumeScale(d['volume']);
       })
       .attr('fill', d => (d.open > d.close ? '#c0392b' : '#03a678')) // green bar if price is rising during that period, and red when price  is falling
       .attr('width', 1)
-      .attr('height', function(d) {
+      .attr('height', d => {
         return height - yVolumeScale(d['volume']);
       });
 
@@ -499,7 +501,7 @@ const setPeriodFilter = filter => {
       d3.selectAll('.lineLegend').remove();
 
       const legendKeys = Object.keys(res[0]);
-      var lineLegend = d3
+      const lineLegend = d3
         .select('#chart')
         .select('g')
         .selectAll('.lineLegend')
@@ -507,7 +509,7 @@ const setPeriodFilter = filter => {
         .enter()
         .append('g')
         .attr('class', 'lineLegend')
-        .attr('transform', function(d, i) {
+        .attr('transform', (d, i) => {
           return `translate(0, ${i * 20})`;
         });
       lineLegend

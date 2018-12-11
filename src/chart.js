@@ -1,24 +1,3 @@
-/*
-// sample method to load JSON file
-const loadJson = (file, callback) => {
-  const xobj = new XMLHttpRequest();
-  xobj.overrideMimeType('application/json');
-  xobj.open('GET', file, true);
-  xobj.onreadystatechange = () => {
-    if (xobj.readyState == 4 && xobj.status == '200') {
-      // Required use of an anonymous callback as .open will NOT return a value but simply returns undefined in asynchronous mode
-      callback(xobj.responseText);
-    }
-  };
-  xobj.send(null);
-};
-
-const getData = loadJson('./sample-data.json', text => {
-  const data = JSON.parse(text);
-  console.log(data);
-});
-*/
-
 const loadData = d3.json('sample-data.json').then(data => {
   const chartResultsData = data['chart']['result'][0];
   const quoteData = chartResultsData['indicators']['quote'][0];
@@ -40,7 +19,7 @@ const movingAverage = (data, numberOfPricePoints) => {
     const end = index;
     const subset = total.slice(start, end + 1);
     const sum = subset.reduce((a, b) => {
-      return a + b.close;
+      return a + b['close'];
     }, 0);
 
     return {
@@ -71,23 +50,22 @@ const initialiseChart = data => {
   const margin = { top: 50, right: 50, bottom: 50, left: 50 };
   const width = window.innerWidth - margin.left - margin.right; // Use the window's width
   const height = window.innerHeight - margin.top - margin.bottom; // Use the window's height
-  const timeFormat = d3.timeFormat('%I:%M %p %a %Y');
 
   // find data range
   const xMin = d3.min(data, d => {
-    return Math.min(d['date']);
+    return d['date'];
   });
 
   const xMax = d3.max(data, d => {
-    return Math.max(d['date']);
+    return d['date'];
   });
 
   const yMin = d3.min(data, d => {
-    return Math.min(d['close']);
+    return d['close'];
   });
 
   const yMax = d3.max(data, d => {
-    return Math.max(d['close']);
+    return d['close'];
   });
 
   // scale using range
@@ -105,12 +83,12 @@ const initialiseChart = data => {
   const svg = d3
     .select('#chart')
     .append('svg')
-    .attr('width', width + margin.left + margin.right)
-    .attr('height', height + margin.top + margin.bottom)
+    .attr('width', width + margin['left'] + margin['right'])
+    .attr('height', height + margin['top'] + margin['bottom'])
     .append('g')
-    .attr('transform', `translate(${margin.left}, ${margin.top})`);
+    .attr('transform', `translate(${margin['left']}, ${margin['top']})`);
 
-  // create an axes components
+  // create the axes component
   svg
     .append('g')
     .attr('id', 'xAxis')
@@ -172,10 +150,6 @@ const initialiseChart = data => {
   focus.append('circle').attr('r', 4.5);
   focus.append('line').classed('x', true);
   focus.append('line').classed('y', true);
-  focus
-    .append('text')
-    .attr('x', 9)
-    .attr('dy', '.35em');
 
   svg
     .append('rect')
@@ -228,7 +202,7 @@ const initialiseChart = data => {
       .attr('y1', 0)
       .attr('y2', height - yScale(currentPoint['close']));
 
-    // updates the legend to display the date, open, close, high, low, and volume and selected mouseover area
+    // updates the legend to display the date, open, close, high, low, and volume of the selected mouseover area
     updateLegends(currentPoint);
   }
 
@@ -292,12 +266,20 @@ const initialiseChart = data => {
     })
     .attr('y', d => {
       return yVolumeScale(d['volume']);
+      //return height - yVolumeScale(d['volume']);
     })
     .attr('class', 'vol')
-    .attr('fill', d => (d.open > d.close ? '#c0392b' : '#03a678')) // green bar if price is rising during that period, and red when price  is falling
+    .attr('fill', (d, i) => {
+      if (i === 0) {
+        return '#03a678';
+      } else {
+        return volData[i - 1].close > d.close ? '#c0392b' : '#03a678'; // green bar if price is rising during that period, and red when price  is falling
+      }
+    })
     .attr('width', 1)
     .attr('height', d => {
       return height - yVolumeScale(d['volume']);
+      //return height - yVolumeScale(d['volume']);
     });
   // testing axis for volume
   /*
@@ -418,7 +400,13 @@ const setPeriodFilter = filter => {
       .attr('y', d => {
         return yVolumeScale(d['volume']);
       })
-      .attr('fill', d => (d.open > d.close ? '#c0392b' : '#03a678')) // green bar if price is rising during that period, and red when price  is falling
+      .attr('fill', (d, i) => {
+        if (i === 0) {
+          return '#03a678';
+        } else {
+          return volData[i - 1].close > d.close ? '#c0392b' : '#03a678'; // green bar if price is rising during that period, and red when price  is falling
+        }
+      })
       .attr('width', 1)
       .attr('height', d => {
         return height - yVolumeScale(d['volume']);
@@ -434,7 +422,13 @@ const setPeriodFilter = filter => {
       .attr('y', d => {
         return yVolumeScale(d['volume']);
       })
-      .attr('fill', d => (d.open > d.close ? '#c0392b' : '#03a678')) // green bar if price is rising during that period, and red when price  is falling
+      .attr('fill', (d, i) => {
+        if (i === 0) {
+          return '#03a678';
+        } else {
+          return volData[i - 1].close > d.close ? '#c0392b' : '#03a678'; // green bar if price is rising during that period, and red when price  is falling
+        }
+      })
       .attr('width', 1)
       .attr('height', d => {
         return height - yVolumeScale(d['volume']);

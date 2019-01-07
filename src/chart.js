@@ -33,12 +33,41 @@ loadData.then(data => {
   initialiseChart(data);
 });
 
+// credits: https://brendansudol.com/writing/responsive-d3
+const responsivefy = svg => {
+  // get container + svg aspect ratio
+  const container = d3.select(svg.node().parentNode),
+    width = parseInt(svg.style('width')),
+    height = parseInt(svg.style('height')),
+    aspect = width / height;
+
+  // get width of container and resize svg to fit it
+  const resize = () => {
+    var targetWidth = parseInt(container.style('width'));
+    svg.attr('width', targetWidth);
+    svg.attr('height', Math.round(targetWidth / aspect));
+  };
+
+  // add viewBox and preserveAspectRatio properties,
+  // and call resize so that svg resizes on inital page load
+  svg
+    .attr('viewBox', '0 0 ' + width + ' ' + height)
+    .attr('perserveAspectRatio', 'xMinYMid')
+    .call(resize);
+
+  // to register multiple listeners for same event type,
+  // you need to add namespace, i.e., 'click.foo'
+  // necessary if you call invoke this function for multiple svgs
+  // api docs: https://github.com/mbostock/d3/wiki/Selections#on
+  d3.select(window).on('resize.' + container.attr('id'), resize);
+};
+
 const initialiseChart = data => {
   data = data.filter(
     row => row['high'] && row['low'] && row['close'] && row['open']
   );
 
-  thisYearStartDate = new Date(new Date().getFullYear() - 2, 0, 1);
+  thisYearStartDate = new Date(new Date().getFullYear() - 3, 0, 1);
 
   // filter out data based on time period
   data = data.filter(row => {
@@ -85,6 +114,7 @@ const initialiseChart = data => {
     .append('svg')
     .attr('width', width + margin['left'] + margin['right'])
     .attr('height', height + margin['top'] + margin['bottom'])
+    .call(responsivefy)
     .append('g')
     .attr('transform', `translate(${margin['left']}, ${margin['top']})`);
 
@@ -294,9 +324,9 @@ const setPeriodFilter = filter => {
     );
     let thisYearStartDate;
     if (filter.value === '') {
-      thisYearStartDate = new Date(new Date().getFullYear() - 2, 0, 1);
+      thisYearStartDate = new Date(new Date().getFullYear() - 3, 0, 1);
     } else if (filter.value === '1') {
-      thisYearStartDate = new Date(new Date().getFullYear(), 0, 1);
+      thisYearStartDate = new Date(2018, 0, 1);
     }
     // filter out data based on time period
     const res = data.filter(row => {
@@ -355,23 +385,41 @@ const setPeriodFilter = filter => {
 
     const svg = d3.select('#chart').transition();
 
-    // update line
     svg
       .select('#priceChart')
       .duration(750)
       .attr('d', line(res));
 
+    //d3.select('#priceChart').attr('d', line(res));
+    const lines = d3.selectAll('#priceChart').data(res, d => d);
+    lines
+      .enter()
+      .append('path')
+      .merge(lines)
+      .transition()
+      .duration(750)
+      .style('fill', 'none')
+      .attr('id', 'priceChart')
+      .attr('stroke', 'steelblue')
+      .attr('d', line);
+
     const movingAverageData = movingAverage(res, 49);
+
     svg
       .select('#movingAverageLine')
       .duration(750)
       .attr('d', movingAverageLine(movingAverageData));
 
+    /*
+    d3.select('#movingAverageLine').attr(
+      'd',
+      movingAverageLine(movingAverageData)
+    );
+    */
     d3.selectAll('#xAxis').call(d3.axisBottom(xScale));
     d3.selectAll('#yAxis').call(d3.axisRight(yScale));
 
     const chart = d3.select('#chart').select('g');
-    const t = d3.transition().duration(750);
     const volData = res;
 
     const yMinVolume = d3.min(volData, d => {
@@ -388,10 +436,13 @@ const setPeriodFilter = filter => {
       .range([height, 0]);
 
     //select
-    const bars = chart.selectAll('.vol').data(res);
+    //const bars = chart.selectAll('.vol').data(res);
+    const bars = chart.selectAll('.vol').data(res, d => d);
+
     //remove unused bars
-    bars.exit().remove();
+    //bars.exit().remove();
     //update existing bars
+    /*
     bars
       .transition(t)
       .attr('x', d => {
@@ -411,11 +462,41 @@ const setPeriodFilter = filter => {
       .attr('height', d => {
         return height - yVolumeScale(d['volume']);
       });
+
     //add new bars
     bars
       .enter()
       .append('rect')
       .attr('class', 'vol')
+      .attr('x', d => {
+        return xScale(d['date']);
+      })
+      .attr('y', d => {
+        return yVolumeScale(d['volume']);
+      })
+      .attr('fill', (d, i) => {
+        if (i === 0) {
+          return '#03a678';
+        } else {
+          return volData[i - 1].close > d.close ? '#c0392b' : '#03a678'; // green bar if price is rising during that period, and red when price  is falling
+        }
+      })
+      .attr('width', 1)
+      .attr('height', d => {
+        return height - yVolumeScale(d['volume']);
+      });
+      */
+    bars.exit().remove();
+    bars
+      .enter()
+      .append('rect')
+      .attr('class', 'vol')
+      //.attr('width', xscale.bandwidth())
+      //.attr('height', 0)
+      .merge(bars)
+      .transition()
+      //.ease(d3.easeLinear, 1)
+      .duration(750)
       .attr('x', d => {
         return xScale(d['date']);
       })

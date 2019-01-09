@@ -1,4 +1,4 @@
-const loadData = d3.json('sample-data.json').then(data => {
+const loadData = d3.json('sample-data-vti.json').then(data => {
   const chartResultsData = data['chart']['result'][0];
   const quoteData = chartResultsData['indicators']['quote'][0];
 
@@ -30,6 +30,7 @@ const movingAverage = (data, numberOfPricePoints) => {
 };
 
 loadData.then(data => {
+  console.log(data);
   initialiseChart(data);
 });
 
@@ -437,7 +438,10 @@ const setPeriodFilter = filter => {
 
     //select
     //const bars = chart.selectAll('.vol').data(res);
-    const bars = chart.selectAll('.vol').data(res, d => d);
+    console.log(res);
+    const bars = chart.selectAll('.vol').data(res, function(d) {
+      return d;
+    });
 
     //remove unused bars
     //bars.exit().remove();
@@ -487,6 +491,7 @@ const setPeriodFilter = filter => {
       });
       */
     bars.exit().remove();
+
     bars
       .enter()
       .append('rect')

@@ -1,4 +1,4 @@
-const loadData = d3.json('sample-data-vti.json').then(data => {
+const loadData = d3.json('sample-data-vig.json').then(data => {
   const chartResultsData = data['chart']['result'][0];
   const quoteData = chartResultsData['indicators']['quote'][0];
 
@@ -68,7 +68,7 @@ const initialiseChart = data => {
     row => row['high'] && row['low'] && row['close'] && row['open']
   );
 
-  thisYearStartDate = new Date(new Date().getFullYear() - 3, 0, 1);
+  thisYearStartDate = new Date(2018, 0, 1);
 
   // filter out data based on time period
   data = data.filter(row => {
@@ -106,7 +106,7 @@ const initialiseChart = data => {
 
   const yScale = d3
     .scaleLinear()
-    .domain([yMin, yMax])
+    .domain([yMin - 5, yMax])
     .range([height, 0]);
 
   // add chart SVG to the page
@@ -285,7 +285,7 @@ const initialiseChart = data => {
   const yVolumeScale = d3
     .scaleLinear()
     .domain([yMinVolume, yMaxVolume])
-    .range([height, 0]);
+    .range([height, height * (3 / 4)]);
 
   svg
     .selectAll()

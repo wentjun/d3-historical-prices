@@ -7,13 +7,13 @@
 <body>
   <div class="flex-container">
     <div class="flex-item">
-      <select onchange="setPeriodFilter(this)">
-        <option selected="selected" value="">All</option>
-        <option value="1">This year</option>
+      <select onchange="setDataset(this)">
+        <option selected="selected" value="vig">Vanguard Dividend Appreciation ETF (VIG)</option>
+        <option value="vti">Vanguard Total Stock Market ETF (VTI)</option>
       </select>
     </div>
     <div class="flex-item">
-      <p>Historical price chart on Nikko AM Singapore STI ETF (G3B.SI), built with D3.js. Prices are displayed in Singapore Dollars(SGD). Feel free to check out the source code at <a target="_blank" href="https://github.com/wentjun/d3-historical-prices">GitHub</a>.</p>
+      <p>Historical price charts of Vanguard Dividend Appreciation ETF (VIG) and Vanguard Total Stock Market ETF (VTI), built with D3.js. Prices are displayed in Singapore Dollars(SGD). Feel free to check out the source code at <a target="_blank" href="https://github.com/wentjun/d3-historical-prices">GitHub</a>.</p>
     </div>
   </div>
   <div id="chart"></div>

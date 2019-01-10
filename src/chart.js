@@ -5,7 +5,7 @@ const loadData = (selectedDataset = 'vig') => {
   } else if (selectedDataset === 'vti') {
     loadFile = 'sample-data-vti.json';
   }
-  console.log(loadFile);
+
   return d3.json(loadFile).then(data => {
     const chartResultsData = data['chart']['result'][0];
     const quoteData = chartResultsData['indicators']['quote'][0];
@@ -39,7 +39,6 @@ const movingAverage = (data, numberOfPricePoints) => {
 };
 
 loadData('vig').then(data => {
-  console.log(data);
   initialiseChart(data);
 });
 
@@ -78,11 +77,12 @@ const initialiseChart = data => {
   );
 
   thisYearStartDate = new Date(2018, 0, 1);
+  thisYearEndDate = new Date(2018, 11, 31);
 
   // filter out data based on time period
   data = data.filter(row => {
     if (row['date']) {
-      return row['date'] >= thisYearStartDate;
+      return row['date'] >= thisYearStartDate && row['date'] <= thisYearEndDate;
     }
   });
 
@@ -334,11 +334,14 @@ const setDataset = selected => {
     );
 
     const thisYearStartDate = new Date(2018, 0, 1);
+    const thisYearEndDate = new Date(2018, 11, 31);
 
     // filter out data based on time period
     const res = data.filter(row => {
       if (row['date']) {
-        return row['date'] >= thisYearStartDate;
+        return (
+          row['date'] >= thisYearStartDate && row['date'] <= thisYearEndDate
+        );
       }
     });
 

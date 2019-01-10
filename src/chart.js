@@ -1,16 +1,25 @@
-const loadData = d3.json('sample-data.json').then(data => {
-  const chartResultsData = data['chart']['result'][0];
-  const quoteData = chartResultsData['indicators']['quote'][0];
+const loadData = (selectedDataset = 'vig') => {
+  let loadFile = '';
+  if (selectedDataset === 'vig') {
+    loadFile = 'sample-data-vig.json';
+  } else if (selectedDataset === 'vti') {
+    loadFile = 'sample-data-vti.json';
+  }
 
-  return chartResultsData['timestamp'].map((time, index) => ({
-    date: new Date(time * 1000),
-    high: quoteData['high'][index],
-    low: quoteData['low'][index],
-    open: quoteData['open'][index],
-    close: quoteData['close'][index],
-    volume: quoteData['volume'][index]
-  }));
-});
+  return d3.json(loadFile).then(data => {
+    const chartResultsData = data['chart']['result'][0];
+    const quoteData = chartResultsData['indicators']['quote'][0];
+
+    return chartResultsData['timestamp'].map((time, index) => ({
+      date: new Date(time * 1000),
+      high: quoteData['high'][index],
+      low: quoteData['low'][index],
+      open: quoteData['open'][index],
+      close: quoteData['close'][index],
+      volume: quoteData['volume'][index]
+    }));
+  });
+};
 
 const movingAverage = (data, numberOfPricePoints) => {
   return data.map((row, index, total) => {
@@ -29,21 +38,51 @@ const movingAverage = (data, numberOfPricePoints) => {
   });
 };
 
-loadData.then(data => {
+loadData('vig').then(data => {
   initialiseChart(data);
 });
+
+// credits: https://brendansudol.com/writing/responsive-d3
+const responsivefy = svg => {
+  // get container + svg aspect ratio
+  const container = d3.select(svg.node().parentNode),
+    width = parseInt(svg.style('width')),
+    height = parseInt(svg.style('height')),
+    aspect = width / height;
+
+  // get width of container and resize svg to fit it
+  const resize = () => {
+    var targetWidth = parseInt(container.style('width'));
+    svg.attr('width', targetWidth);
+    svg.attr('height', Math.round(targetWidth / aspect));
+  };
+
+  // add viewBox and preserveAspectRatio properties,
+  // and call resize so that svg resizes on inital page load
+  svg
+    .attr('viewBox', '0 0 ' + width + ' ' + height)
+    .attr('perserveAspectRatio', 'xMinYMid')
+    .call(resize);
+
+  // to register multiple listeners for same event type,
+  // you need to add namespace, i.e., 'click.foo'
+  // necessary if you call invoke this function for multiple svgs
+  // api docs: https://github.com/mbostock/d3/wiki/Selections#on
+  d3.select(window).on('resize.' + container.attr('id'), resize);
+};
 
 const initialiseChart = data => {
   data = data.filter(
     row => row['high'] && row['low'] && row['close'] && row['open']
   );
 
-  thisYearStartDate = new Date(new Date().getFullYear() - 2, 0, 1);
+  thisYearStartDate = new Date(2018, 0, 1);
+  thisYearEndDate = new Date(2018, 11, 31);
 
   // filter out data based on time period
   data = data.filter(row => {
     if (row['date']) {
-      return row['date'] >= thisYearStartDate;
+      return row['date'] >= thisYearStartDate && row['date'] <= thisYearEndDate;
     }
   });
 
@@ -76,7 +115,7 @@ const initialiseChart = data => {
 
   const yScale = d3
     .scaleLinear()
-    .domain([yMin, yMax])
+    .domain([yMin - 5, yMax])
     .range([height, 0]);
 
   // add chart SVG to the page
@@ -85,6 +124,7 @@ const initialiseChart = data => {
     .append('svg')
     .attr('width', width + margin['left'] + margin['right'])
     .attr('height', height + margin['top'] + margin['bottom'])
+    .call(responsivefy)
     .append('g')
     .attr('transform', `translate(${margin['left']}, ${margin['top']})`);
 
@@ -254,7 +294,7 @@ const initialiseChart = data => {
   const yVolumeScale = d3
     .scaleLinear()
     .domain([yMinVolume, yMaxVolume])
-    .range([height, 0]);
+    .range([height, height * (3 / 4)]);
 
   svg
     .selectAll()
@@ -287,21 +327,21 @@ const initialiseChart = data => {
   */
 };
 
-const setPeriodFilter = filter => {
-  loadData.then(data => {
+const setDataset = selected => {
+  loadData(selected.value).then(data => {
     data = data.filter(
       row => row['high'] && row['low'] && row['close'] && row['open']
     );
-    let thisYearStartDate;
-    if (filter.value === '') {
-      thisYearStartDate = new Date(new Date().getFullYear() - 2, 0, 1);
-    } else if (filter.value === '1') {
-      thisYearStartDate = new Date(new Date().getFullYear(), 0, 1);
-    }
+
+    const thisYearStartDate = new Date(2018, 0, 1);
+    const thisYearEndDate = new Date(2018, 11, 31);
+
     // filter out data based on time period
     const res = data.filter(row => {
       if (row['date']) {
-        return row['date'] >= thisYearStartDate;
+        return (
+          row['date'] >= thisYearStartDate && row['date'] <= thisYearEndDate
+        );
       }
     });
 
@@ -331,7 +371,7 @@ const setPeriodFilter = filter => {
 
     const yScale = d3
       .scaleLinear()
-      .domain([yMin, yMax])
+      .domain([yMin - 5, yMax])
       .range([height, 0]);
 
     const line = d3
@@ -355,13 +395,25 @@ const setPeriodFilter = filter => {
 
     const svg = d3.select('#chart').transition();
 
-    // update line
     svg
       .select('#priceChart')
       .duration(750)
       .attr('d', line(res));
 
+    const lines = d3.selectAll('#priceChart').data(res, d => d);
+    lines
+      .enter()
+      .append('path')
+      .merge(lines)
+      .transition()
+      .duration(750)
+      .style('fill', 'none')
+      .attr('id', 'priceChart')
+      .attr('stroke', 'steelblue')
+      .attr('d', line);
+
     const movingAverageData = movingAverage(res, 49);
+
     svg
       .select('#movingAverageLine')
       .duration(750)
@@ -371,7 +423,6 @@ const setPeriodFilter = filter => {
     d3.selectAll('#yAxis').call(d3.axisRight(yScale));
 
     const chart = d3.select('#chart').select('g');
-    const t = d3.transition().duration(750);
     const volData = res;
 
     const yMinVolume = d3.min(volData, d => {
@@ -385,37 +436,20 @@ const setPeriodFilter = filter => {
     const yVolumeScale = d3
       .scaleLinear()
       .domain([yMinVolume, yMaxVolume])
-      .range([height, 0]);
+      .range([height, height * (3 / 4)]);
 
-    //select
-    const bars = chart.selectAll('.vol').data(res);
-    //remove unused bars
+    //select, followed by updating data join
+    const bars = chart.selectAll('.vol').data(res, d => d['date']);
+
     bars.exit().remove();
-    //update existing bars
-    bars
-      .transition(t)
-      .attr('x', d => {
-        return xScale(d['date']);
-      })
-      .attr('y', d => {
-        return yVolumeScale(d['volume']);
-      })
-      .attr('fill', (d, i) => {
-        if (i === 0) {
-          return '#03a678';
-        } else {
-          return volData[i - 1].close > d.close ? '#c0392b' : '#03a678'; // green bar if price is rising during that period, and red when price  is falling
-        }
-      })
-      .attr('width', 1)
-      .attr('height', d => {
-        return height - yVolumeScale(d['volume']);
-      });
-    //add new bars
+
     bars
       .enter()
       .append('rect')
       .attr('class', 'vol')
+      .merge(bars)
+      .transition()
+      .duration(750)
       .attr('x', d => {
         return xScale(d['date']);
       })

@@ -1,7 +1,15 @@
 class HistoricalPriceChart {
   constructor() {
+    this.margin;
+    this.width;
+    this.height;
+    this.xScale;
+    this.yscale;
+
+    this.currentData = [];
     this.loadData('vig').then(data => {
-      this.initialiseChart(data);
+      this.currentData = data;
+      this.initialiseChart();
     });
     const selectElement = document.getElementById('select-stock');
     selectElement.addEventListener('change', event => {
@@ -78,8 +86,8 @@ class HistoricalPriceChart {
     d3.select(window).on('resize.' + container.attr('id'), resize);
   }
 
-  initialiseChart(data) {
-    data = data.filter(
+  initialiseChart() {
+    let data = this.currentData.filter(
       row => row['high'] && row['low'] && row['close'] && row['open']
     );
 
@@ -95,9 +103,9 @@ class HistoricalPriceChart {
       }
     });
 
-    const margin = { top: 50, right: 50, bottom: 50, left: 50 };
-    const width = window.innerWidth - margin.left - margin.right; // Use the window's width
-    const height = window.innerHeight - margin.top - margin.bottom; // Use the window's height
+    this.margin = { top: 50, right: 50, bottom: 50, left: 50 };
+    this.width = window.innerWidth - this.margin.left - this.margin.right; // Use the window's width
+    this.height = window.innerHeight - this.margin.top - this.margin.bottom; // Use the window's height
 
     // find data range
     const xMin = d3.min(data, d => {
@@ -117,38 +125,41 @@ class HistoricalPriceChart {
     });
 
     // scale using range
-    const xScale = d3
+    this.xScale = d3
       .scaleTime()
       .domain([xMin, xMax])
-      .range([0, width]);
+      .range([0, this.width]);
 
-    const yScale = d3
+    this.yScale = d3
       .scaleLinear()
       .domain([yMin - 5, yMax])
-      .range([height, 0]);
+      .range([this.height, 0]);
 
     // add chart SVG to the page
     const svg = d3
       .select('#chart')
       .append('svg')
-      .attr('width', width + margin['left'] + margin['right'])
-      .attr('height', height + margin['top'] + margin['bottom'])
+      .attr('width', this.width + this.margin['left'] + this.margin['right'])
+      .attr('height', this.height + this.margin['top'] + this.margin['bottom'])
       .call(this.responsivefy)
       .append('g')
-      .attr('transform', `translate(${margin['left']}, ${margin['top']})`);
+      .attr(
+        'transform',
+        `translate(${this.margin['left']}, ${this.margin['top']})`
+      );
 
     // create the axes component
     svg
       .append('g')
       .attr('id', 'xAxis')
-      .attr('transform', `translate(0, ${height})`)
-      .call(d3.axisBottom(xScale));
+      .attr('transform', `translate(0, ${this.height})`)
+      .call(d3.axisBottom(this.xScale));
 
     svg
       .append('g')
       .attr('id', 'yAxis')
-      .attr('transform', `translate(${width}, 0)`)
-      .call(d3.axisRight(yScale));
+      .attr('transform', `translate(${this.width}, 0)`)
+      .call(d3.axisRight(this.yScale));
 
     // renders close price line chart and moving average line chart
 
@@ -156,19 +167,19 @@ class HistoricalPriceChart {
     const line = d3
       .line()
       .x(d => {
-        return xScale(d['date']);
+        return this.xScale(d['date']);
       })
       .y(d => {
-        return yScale(d['close']);
+        return this.yScale(d['close']);
       });
 
     const movingAverageLine = d3
       .line()
       .x(d => {
-        return xScale(d['date']);
+        return this.xScale(d['date']);
       })
       .y(d => {
-        return yScale(d['average']);
+        return this.yScale(d['average']);
       })
       .curve(d3.curveBasis);
 
@@ -203,8 +214,8 @@ class HistoricalPriceChart {
     svg
       .append('rect')
       .attr('class', 'overlay')
-      .attr('width', width)
-      .attr('height', height)
+      .attr('width', this.width)
+      .attr('height', this.height)
       .on('mouseover', () => focus.style('display', null))
       .on('mouseout', () => focus.style('display', 'none'))
       .on('mousemove', generateCrosshair);
@@ -220,10 +231,11 @@ class HistoricalPriceChart {
     //returs insertion point
     const bisectDate = d3.bisector(d => d.date).left;
 
+    const that = this;
     /* mouseover function to generate crosshair */
     function generateCrosshair() {
       //returns corresponding value from the domain
-      const correspondingDate = xScale.invert(d3.mouse(this)[0]);
+      const correspondingDate = that.xScale.invert(d3.mouse(this)[0]);
       //gets insertion point
       const i = bisectDate(data, correspondingDate, 1);
       const d0 = data[i - 1];
@@ -234,7 +246,7 @@ class HistoricalPriceChart {
           : d0;
       focus.attr(
         'transform',
-        `translate(${xScale(currentPoint['date'])}, ${yScale(
+        `translate(${that.xScale(currentPoint['date'])}, ${that.yScale(
           currentPoint['close']
         )})`
       );
@@ -242,7 +254,7 @@ class HistoricalPriceChart {
       focus
         .select('line.x')
         .attr('x1', 0)
-        .attr('x2', width - xScale(currentPoint['date']))
+        .attr('x2', that.width - that.xScale(currentPoint['date']))
         .attr('y1', 0)
         .attr('y2', 0);
 
@@ -251,45 +263,11 @@ class HistoricalPriceChart {
         .attr('x1', 0)
         .attr('x2', 0)
         .attr('y1', 0)
-        .attr('y2', height - yScale(currentPoint['close']));
+        .attr('y2', that.height - that.yScale(currentPoint['close']));
 
       // updates the legend to display the date, open, close, high, low, and volume of the selected mouseover area
-      updateLegends(currentPoint);
+      that.updateLegends(currentPoint);
     }
-
-    /* Legends */
-    const updateLegends = currentData => {
-      d3.selectAll('.lineLegend').remove();
-
-      const legendKeys = Object.keys(data[0]);
-      const lineLegend = svg
-        .selectAll('.lineLegend')
-        .data(legendKeys)
-        .enter()
-        .append('g')
-        .attr('class', 'lineLegend')
-        .attr('transform', (d, i) => {
-          return `translate(0, ${i * 20})`;
-        });
-      lineLegend
-        .append('text')
-        .text(d => {
-          if (d === 'date') {
-            return `${d}: ${currentData[d].toLocaleDateString()}`;
-          } else if (
-            d === 'high' ||
-            d === 'low' ||
-            d === 'open' ||
-            d === 'close'
-          ) {
-            return `${d}: ${currentData[d].toFixed(2)}`;
-          } else {
-            return `${d}: ${currentData[d]}`;
-          }
-        })
-        .style('fill', 'white')
-        .attr('transform', 'translate(15,9)'); //align texts with boxes
-    };
 
     /* Volume series bars */
     const volData = data.filter(d => d['volume'] !== null && d['volume'] !== 0);
@@ -305,7 +283,7 @@ class HistoricalPriceChart {
     const yVolumeScale = d3
       .scaleLinear()
       .domain([yMinVolume, yMaxVolume])
-      .range([height, height * (3 / 4)]);
+      .range([this.height, this.height * (3 / 4)]);
 
     svg
       .selectAll()
@@ -313,7 +291,7 @@ class HistoricalPriceChart {
       .enter()
       .append('rect')
       .attr('x', d => {
-        return xScale(d['date']);
+        return this.xScale(d['date']);
       })
       .attr('y', d => {
         return yVolumeScale(d['volume']);
@@ -329,7 +307,7 @@ class HistoricalPriceChart {
       })
       .attr('width', 1)
       .attr('height', d => {
-        return height - yVolumeScale(d['volume']);
+        return this.height - yVolumeScale(d['volume']);
         //return height - yVolumeScale(d['volume']);
       });
     // testing axis for volume
@@ -339,13 +317,25 @@ class HistoricalPriceChart {
   }
 
   setDataset(event) {
-    this.loadData(event.target.value).then(data => {
-      data = data.filter(
-        row => row['high'] && row['low'] && row['close'] && row['open']
-      );
-
+    this.loadData(event.target.value).then(response => {
       const thisYearStartDate = new Date(2018, 0, 1);
       const thisYearEndDate = new Date(2018, 11, 31);
+
+      const res = response
+        .filter(row => row['high'] && row['low'] && row['close'] && row['open'])
+        .filter(row => {
+          if (row['date']) {
+            return (
+              row['date'] >= thisYearStartDate && row['date'] <= thisYearEndDate
+            );
+          }
+        });
+      this.currentData = res;
+      /*
+      this.currentData = response;
+      let data = this.currentData.filter(
+        row => row['high'] && row['low'] && row['close'] && row['open']
+      );
 
       // filter out data based on time period
       const res = data.filter(row => {
@@ -355,10 +345,10 @@ class HistoricalPriceChart {
           );
         }
       });
-
-      const margin = { top: 50, right: 50, bottom: 50, left: 50 };
-      const width = window.innerWidth - margin.left - margin.right; // Use the window's width
-      const height = window.innerHeight - margin.top - margin.bottom; // Use the window's height
+      */
+      this.margin = { top: 50, right: 50, bottom: 50, left: 50 };
+      this.width = window.innerWidth - this.margin.left - this.margin.right; // Use the window's width
+      this.height = window.innerHeight - this.margin.top - this.margin.bottom; // Use the window's height
       const xMin = d3.min(res, d => {
         return Math.min(d['date']);
       });
@@ -375,32 +365,32 @@ class HistoricalPriceChart {
         return Math.max(d['close']);
       });
 
-      const xScale = d3
+      this.xScale = d3
         .scaleTime()
         .domain([xMin, xMax])
-        .range([0, width]);
+        .range([0, this.width]);
 
-      const yScale = d3
+      this.yScale = d3
         .scaleLinear()
         .domain([yMin - 5, yMax])
-        .range([height, 0]);
+        .range([this.height, 0]);
 
       const line = d3
         .line()
         .x(d => {
-          return xScale(d['date']);
+          return this.xScale(d['date']);
         })
         .y(d => {
-          return yScale(d['close']);
+          return this.yScale(d['close']);
         });
 
       const movingAverageLine = d3
         .line()
         .x(d => {
-          return xScale(d['date']);
+          return this.xScale(d['date']);
         })
         .y(d => {
-          return yScale(d['average']);
+          return this.yScale(d['average']);
         })
         .curve(d3.curveBasis);
 
@@ -430,8 +420,8 @@ class HistoricalPriceChart {
         .duration(750)
         .attr('d', movingAverageLine(movingAverageData));
 
-      d3.selectAll('#xAxis').call(d3.axisBottom(xScale));
-      d3.selectAll('#yAxis').call(d3.axisRight(yScale));
+      d3.selectAll('#xAxis').call(d3.axisBottom(this.xScale));
+      d3.selectAll('#yAxis').call(d3.axisRight(this.yScale));
 
       const chart = d3.select('#chart').select('g');
       const volData = res;
@@ -447,7 +437,7 @@ class HistoricalPriceChart {
       const yVolumeScale = d3
         .scaleLinear()
         .domain([yMinVolume, yMaxVolume])
-        .range([height, height * (3 / 4)]);
+        .range([this.height, this.height * (3 / 4)]);
 
       //select, followed by updating data join
       const bars = chart.selectAll('.vol').data(res, d => d['date']);
@@ -462,7 +452,7 @@ class HistoricalPriceChart {
         .transition()
         .duration(750)
         .attr('x', d => {
-          return xScale(d['date']);
+          return this.xScale(d['date']);
         })
         .attr('y', d => {
           return yVolumeScale(d['volume']);
@@ -476,11 +466,12 @@ class HistoricalPriceChart {
         })
         .attr('width', 1)
         .attr('height', d => {
-          return height - yVolumeScale(d['volume']);
+          return this.height - yVolumeScale(d['volume']);
         });
 
       //select
-      const overlay = chart.selectAll('.overlay').data(res);
+      const overlay = chart.selectAll('.overlay').data(this.currentData);
+
       //remove old crosshair
       overlay.exit().remove();
 
@@ -490,8 +481,8 @@ class HistoricalPriceChart {
       //update crosshair
       overlay
         .attr('class', 'overlay')
-        .attr('width', width)
-        .attr('height', height)
+        .attr('width', this.width)
+        .attr('height', this.height)
         .on('mouseover', () => focus.style('display', null))
         .on('mouseout', () => focus.style('display', 'none'))
         .on('mousemove', generateCrosshair);
@@ -499,21 +490,22 @@ class HistoricalPriceChart {
       const focus = d3.select('.focus');
       const bisectDate = d3.bisector(d => d.date).left;
 
+      const that = this;
       /* mouseover function to generate crosshair */
       function generateCrosshair() {
         //returns corresponding value from the domain
-        const correspondingDate = xScale.invert(d3.mouse(this)[0]);
+        const correspondingDate = that.xScale.invert(d3.mouse(this)[0]);
         //gets insertion point
-        const i = bisectDate(data, correspondingDate, 1);
-        const d0 = data[i - 1];
-        const d1 = data[i];
+        const i = bisectDate(that.currentData, correspondingDate, 1);
+        const d0 = that.currentData[i - 1];
+        const d1 = that.currentData[i];
         const currentPoint =
           correspondingDate - d0['date'] > d1['date'] - correspondingDate
             ? d1
             : d0;
         focus.attr(
           'transform',
-          `translate(${xScale(currentPoint['date'])}, ${yScale(
+          `translate(${that.xScale(currentPoint['date'])}, ${that.yScale(
             currentPoint['close']
           )})`
         );
@@ -521,7 +513,7 @@ class HistoricalPriceChart {
         focus
           .select('line.x')
           .attr('x1', 0)
-          .attr('x2', width - xScale(currentPoint['date']))
+          .attr('x2', that.width - that.xScale(currentPoint['date']))
           .attr('y1', 0)
           .attr('y2', 0);
 
@@ -530,46 +522,46 @@ class HistoricalPriceChart {
           .attr('x1', 0)
           .attr('x2', 0)
           .attr('y1', 0)
-          .attr('y2', height - yScale(currentPoint['close']));
+          .attr('y2', that.height - that.yScale(currentPoint['close']));
 
         // updates the legend to display the date, open, close, high, low, and volume and selected mouseover area
-        updateLegends(currentPoint);
+        that.updateLegends(currentPoint);
       }
-
-      const updateLegends = currentData => {
-        d3.selectAll('.lineLegend').remove();
-
-        const legendKeys = Object.keys(res[0]);
-        const lineLegend = d3
-          .select('#chart')
-          .select('g')
-          .selectAll('.lineLegend')
-          .data(legendKeys)
-          .enter()
-          .append('g')
-          .attr('class', 'lineLegend')
-          .attr('transform', (d, i) => {
-            return `translate(0, ${i * 20})`;
-          });
-        lineLegend
-          .append('text')
-          .text(d => {
-            if (d === 'date') {
-              return `${d}: ${currentData[d].toLocaleDateString()}`;
-            } else if (
-              d === 'high' ||
-              d === 'low' ||
-              d === 'open' ||
-              d === 'close'
-            ) {
-              return `${d}: ${currentData[d].toFixed(2)}`;
-            } else {
-              return `${d}: ${currentData[d]}`;
-            }
-          })
-          .style('fill', 'white')
-          .attr('transform', 'translate(15,9)'); //align texts with boxes
-      };
     });
+  }
+
+  updateLegends(currentPoint) {
+    d3.selectAll('.lineLegend').remove();
+
+    const legendKeys = Object.keys(currentPoint);
+    const lineLegend = d3
+      .select('#chart')
+      .select('g')
+      .selectAll('.lineLegend')
+      .data(legendKeys)
+      .enter()
+      .append('g')
+      .attr('class', 'lineLegend')
+      .attr('transform', (d, i) => {
+        return `translate(0, ${i * 20})`;
+      });
+    lineLegend
+      .append('text')
+      .text(d => {
+        if (d === 'date') {
+          return `${d}: ${currentPoint[d].toLocaleDateString()}`;
+        } else if (
+          d === 'high' ||
+          d === 'low' ||
+          d === 'open' ||
+          d === 'close'
+        ) {
+          return `${d}: ${currentPoint[d].toFixed(2)}`;
+        } else {
+          return `${d}: ${currentPoint[d]}`;
+        }
+      })
+      .style('fill', 'white')
+      .attr('transform', 'translate(15,9)'); //align texts with boxes
   }
 }

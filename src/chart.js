@@ -270,13 +270,11 @@ class HistoricalPriceChart {
     }
 
     /* Volume series bars */
-    const volData = data.filter(d => d['volume'] !== null && d['volume'] !== 0);
-
-    const yMinVolume = d3.min(volData, d => {
+    const yMinVolume = d3.min(data, d => {
       return Math.min(d['volume']);
     });
 
-    const yMaxVolume = d3.max(volData, d => {
+    const yMaxVolume = d3.max(data, d => {
       return Math.max(d['volume']);
     });
 
@@ -287,7 +285,7 @@ class HistoricalPriceChart {
 
     svg
       .selectAll()
-      .data(volData)
+      .data(data)
       .enter()
       .append('rect')
       .attr('x', d => {
@@ -302,7 +300,7 @@ class HistoricalPriceChart {
         if (i === 0) {
           return '#03a678';
         } else {
-          return volData[i - 1].close > d.close ? '#c0392b' : '#03a678'; // green bar if price is rising during that period, and red when price  is falling
+          return data[i - 1].close > d.close ? '#c0392b' : '#03a678'; // green bar if price is rising during that period, and red when price  is falling
         }
       })
       .attr('width', 1)
@@ -320,7 +318,6 @@ class HistoricalPriceChart {
     this.loadData(event.target.value).then(response => {
       const thisYearStartDate = new Date(2018, 0, 1);
       const thisYearEndDate = new Date(2018, 11, 31);
-
       const res = response
         .filter(row => row['high'] && row['low'] && row['close'] && row['open'])
         .filter(row => {
@@ -331,24 +328,10 @@ class HistoricalPriceChart {
           }
         });
       this.currentData = res;
-      /*
-      this.currentData = response;
-      let data = this.currentData.filter(
-        row => row['high'] && row['low'] && row['close'] && row['open']
-      );
-
-      // filter out data based on time period
-      const res = data.filter(row => {
-        if (row['date']) {
-          return (
-            row['date'] >= thisYearStartDate && row['date'] <= thisYearEndDate
-          );
-        }
-      });
-      */
       this.margin = { top: 50, right: 50, bottom: 50, left: 50 };
       this.width = window.innerWidth - this.margin.left - this.margin.right; // Use the window's width
       this.height = window.innerHeight - this.margin.top - this.margin.bottom; // Use the window's height
+
       const xMin = d3.min(res, d => {
         return Math.min(d['date']);
       });
@@ -395,26 +378,12 @@ class HistoricalPriceChart {
         .curve(d3.curveBasis);
 
       const svg = d3.select('#chart').transition();
-
       svg
         .select('#priceChart')
         .duration(750)
         .attr('d', line(res));
 
-      const lines = d3.selectAll('#priceChart').data(res, d => d);
-      lines
-        .enter()
-        .append('path')
-        .merge(lines)
-        .transition()
-        .duration(750)
-        .style('fill', 'none')
-        .attr('id', 'priceChart')
-        .attr('stroke', 'steelblue')
-        .attr('d', line);
-
       const movingAverageData = this.movingAverage(res, 49);
-
       svg
         .select('#movingAverageLine')
         .duration(750)
@@ -424,13 +393,12 @@ class HistoricalPriceChart {
       d3.selectAll('#yAxis').call(d3.axisRight(this.yScale));
 
       const chart = d3.select('#chart').select('g');
-      const volData = res;
 
-      const yMinVolume = d3.min(volData, d => {
+      const yMinVolume = d3.min(res, d => {
         return Math.min(d['volume']);
       });
 
-      const yMaxVolume = d3.max(volData, d => {
+      const yMaxVolume = d3.max(res, d => {
         return Math.max(d['volume']);
       });
 
@@ -461,7 +429,7 @@ class HistoricalPriceChart {
           if (i === 0) {
             return '#03a678';
           } else {
-            return volData[i - 1].close > d.close ? '#c0392b' : '#03a678'; // green bar if price is rising during that period, and red when price  is falling
+            return res[i - 1].close > d.close ? '#c0392b' : '#03a678'; // green bar if price is rising during that period, and red when price  is falling
           }
         })
         .attr('width', 1)

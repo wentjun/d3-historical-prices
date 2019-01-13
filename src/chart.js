@@ -375,12 +375,35 @@ class HistoricalPriceChart {
       }
     });
     console.log(dividendData);
-    console.log(d3.symbols);
+    const div = d3
+      .select('body')
+      .append('div')
+      .attr('class', 'tooltip')
+      .style('opacity', 0);
     const dividendSymbol = svg
       .selectAll('dividend')
       .data(dividendData)
       .enter()
-      .append('g');
+      .append('g')
+      .on('mousemove', d => {
+        div
+          .style('opacity', 1)
+          .style('color', '#464e56')
+          .style('left', d3.event.pageX - 80 + 'px')
+          .style('top', d3.event.pageY - 50 + 'px');
+        div.html(
+          `<strong>Dividends: ${d['yield']}</strong> <br/> Date: ${d[
+            'date'
+          ].toLocaleDateString()}`
+        );
+      })
+      .on('mouseout', function(d) {
+        div
+          .transition()
+          .duration(500)
+          .style('opacity', 0);
+      });
+
     dividendSymbol
       .append('path')
       .attr('class', 'dividend')
@@ -392,20 +415,24 @@ class HistoricalPriceChart {
           .type(d3.symbolSquare)
       )
       .attr('transform', (d, i) => {
-        return `translate(${this.xScale(d['date'])},${this.height - 50})`;
-      });
-    //.style('fill', '#2e3131');
+        return `translate(${this.xScale(d['date'])},${this.height - 80})`;
+      })
+      .style('cursor', 'pointer')
+      .style('fill', 'darkgrey');
+
     dividendSymbol
       .append('text')
-      .attr('x', -5)
+      .attr('x', -6)
       .attr('y', 5)
       .text(function(d) {
         return 'D';
       })
       .attr('transform', (d, i) => {
-        return `translate(${this.xScale(d['date'])},${this.height - 50})`;
+        return `translate(${this.xScale(d['date'])},${this.height - 80})`;
       })
+      .style('cursor', 'pointer')
       .style('fill', 'white');
+
     /*
     svg
       .selectAll('dividend-text')

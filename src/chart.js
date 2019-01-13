@@ -5,9 +5,10 @@ class HistoricalPriceChart {
     this.height;
     this.xScale;
     this.yscale;
-    this.currentData = [];
+    this.currentData = {};
 
     this.loadData('vig').then(data => {
+      console.log(data);
       this.currentData = data;
       this.initialiseChart();
     });
@@ -31,7 +32,15 @@ class HistoricalPriceChart {
     return d3.json(loadFile).then(data => {
       const chartResultsData = data['chart']['result'][0];
       const quoteData = chartResultsData['indicators']['quote'][0];
-
+      /*
+      console.log(
+        Object.values(chartResultsData['events']['dividends']).map(res => {
+          return {
+            date: new Date(res['date'] * 1000),
+            yield: res['amount']
+          };
+        })
+      );
       return chartResultsData['timestamp'].map((time, index) => ({
         date: new Date(time * 1000),
         high: quoteData['high'][index],
@@ -40,6 +49,25 @@ class HistoricalPriceChart {
         close: quoteData['close'][index],
         volume: quoteData['volume'][index]
       }));
+      */
+      return {
+        dividends: Object.values(chartResultsData['events']['dividends']).map(
+          res => {
+            return {
+              date: new Date(res['date'] * 1000),
+              yield: res['amount']
+            };
+          }
+        ),
+        quote: chartResultsData['timestamp'].map((time, index) => ({
+          date: new Date(time * 1000),
+          high: quoteData['high'][index],
+          low: quoteData['low'][index],
+          open: quoteData['open'][index],
+          close: quoteData['close'][index],
+          volume: quoteData['volume'][index]
+        }))
+      };
     });
   }
 
@@ -90,7 +118,7 @@ class HistoricalPriceChart {
   }
 
   initialiseChart() {
-    let data = this.currentData.filter(
+    let data = this.currentData['quote'].filter(
       row => row['high'] && row['low'] && row['close'] && row['open']
     );
 
@@ -315,13 +343,90 @@ class HistoricalPriceChart {
     /*
     svg.append('g').call(d3.axisLeft(yVolumeScale));
     */
+
+    /* scatter plot depicting dividend yield */
+    /*
+    svg
+      .selectAll('dividend')
+      .data(data)
+      .enter()
+      .append('path')
+      .attr('class', 'dividend')
+      .attr('d', d3.symbol().type('d3.symbolSquare'))
+      .attr(
+        'transform',
+        d =>
+          'translate(' +
+          this.xScale(d['date']) +
+          ',' +
+          this.yScale(d['close']) +
+          ')'
+      );
+      */
+    //const thisYearStartDate = new Date(2018, 0, 1);
+    //const thisYearEndDate = new Date(2018, 11, 31);
+
+    // filter out data based on time period
+    const dividendData = this.currentData['dividends'].filter(row => {
+      if (row['date']) {
+        return (
+          row['date'] >= thisYearStartDate && row['date'] <= thisYearEndDate
+        );
+      }
+    });
+    console.log(dividendData);
+    console.log(d3.symbols);
+    const dividendSymbol = svg
+      .selectAll('dividend')
+      .data(dividendData)
+      .enter()
+      .append('g');
+    dividendSymbol
+      .append('path')
+      .attr('class', 'dividend')
+      .attr(
+        'd',
+        d3
+          .symbol()
+          .size(300)
+          .type(d3.symbolSquare)
+      )
+      .attr('transform', (d, i) => {
+        return `translate(${this.xScale(d['date'])},${this.height - 50})`;
+      });
+    //.style('fill', '#2e3131');
+    dividendSymbol
+      .append('text')
+      .attr('x', -5)
+      .attr('y', 5)
+      .text(function(d) {
+        return 'D';
+      })
+      .attr('transform', (d, i) => {
+        return `translate(${this.xScale(d['date'])},${this.height - 50})`;
+      })
+      .style('fill', 'white');
+    /*
+    svg
+      .selectAll('dividend-text')
+      .data(dividendData)
+      .enter()
+      .append('text')
+      .style('color', 'white')
+      .text(function(d) {
+        return 'D';
+      })
+      .attr('transform', (d, i) => {
+        return `translate(${this.xScale(d['date'])},${this.height - 50})`;
+      });
+      */
   }
 
   setDataset(event) {
     this.loadData(event.target.value).then(response => {
       const thisYearStartDate = new Date(2018, 0, 1);
       const thisYearEndDate = new Date(2018, 11, 31);
-      const res = response
+      const res = response['quote']
         .filter(row => row['high'] && row['low'] && row['close'] && row['open'])
         .filter(row => {
           if (row['date']) {
@@ -330,7 +435,7 @@ class HistoricalPriceChart {
             );
           }
         });
-      this.currentData = res;
+      //this.currentData = res;
       this.margin = { top: 50, right: 50, bottom: 50, left: 50 };
       this.width = window.innerWidth - this.margin.left - this.margin.right; // Use the window's width
       this.height = window.innerHeight - this.margin.top - this.margin.bottom; // Use the window's height
@@ -441,7 +546,7 @@ class HistoricalPriceChart {
         });
 
       //select
-      const overlay = chart.selectAll('.overlay').data(this.currentData);
+      const overlay = chart.selectAll('.overlay').data(res);
 
       //remove old crosshair
       overlay.exit().remove();
@@ -467,9 +572,9 @@ class HistoricalPriceChart {
         //returns corresponding value from the domain
         const correspondingDate = that.xScale.invert(d3.mouse(this)[0]);
         //gets insertion point
-        const i = bisectDate(that.currentData, correspondingDate, 1);
-        const d0 = that.currentData[i - 1];
-        const d1 = that.currentData[i];
+        const i = bisectDate(res, correspondingDate, 1);
+        const d0 = res[i - 1];
+        const d1 = res[i];
         const currentPoint =
           correspondingDate - d0['date'] > d1['date'] - correspondingDate
             ? d1

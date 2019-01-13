@@ -5,12 +5,13 @@ class HistoricalPriceChart {
     this.height;
     this.xScale;
     this.yscale;
-
     this.currentData = [];
+
     this.loadData('vig').then(data => {
       this.currentData = data;
       this.initialiseChart();
     });
+
     const selectElement = document.getElementById('select-stock');
     selectElement.addEventListener('change', event => {
       this.setDataset(event);
@@ -23,6 +24,8 @@ class HistoricalPriceChart {
       loadFile = 'sample-data-vig.json';
     } else if (selectedDataset === 'vti') {
       loadFile = 'sample-data-vti.json';
+    } else if (selectedDataset === 'vea') {
+      loadFile = 'sample-data-vea.json';
     }
 
     return d3.json(loadFile).then(data => {

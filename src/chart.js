@@ -5,7 +5,7 @@ class HistoricalPriceChart {
     this.height;
     this.xScale;
     this.yscale;
-    this.currentData = [];
+    this.currentData = {};
 
     this.loadData('vig').then(data => {
       this.currentData = data;
@@ -32,14 +32,24 @@ class HistoricalPriceChart {
       const chartResultsData = data['chart']['result'][0];
       const quoteData = chartResultsData['indicators']['quote'][0];
 
-      return chartResultsData['timestamp'].map((time, index) => ({
-        date: new Date(time * 1000),
-        high: quoteData['high'][index],
-        low: quoteData['low'][index],
-        open: quoteData['open'][index],
-        close: quoteData['close'][index],
-        volume: quoteData['volume'][index]
-      }));
+      return {
+        dividends: Object.values(chartResultsData['events']['dividends']).map(
+          res => {
+            return {
+              date: new Date(res['date'] * 1000),
+              yield: res['amount']
+            };
+          }
+        ),
+        quote: chartResultsData['timestamp'].map((time, index) => ({
+          date: new Date(time * 1000),
+          high: quoteData['high'][index],
+          low: quoteData['low'][index],
+          open: quoteData['open'][index],
+          close: quoteData['close'][index],
+          volume: quoteData['volume'][index]
+        }))
+      };
     });
   }
 
@@ -90,7 +100,7 @@ class HistoricalPriceChart {
   }
 
   initialiseChart() {
-    let data = this.currentData.filter(
+    let data = this.currentData['quote'].filter(
       row => row['high'] && row['low'] && row['close'] && row['open']
     );
 
@@ -315,13 +325,81 @@ class HistoricalPriceChart {
     /*
     svg.append('g').call(d3.axisLeft(yVolumeScale));
     */
+
+    /* scatter plot depicting dividend yield */
+
+    // get dividend data for year of 2018
+    const dividendData = this.currentData['dividends'].filter(row => {
+      if (row['date']) {
+        return (
+          row['date'] >= thisYearStartDate && row['date'] <= thisYearEndDate
+        );
+      }
+    });
+
+    const dividendTooltip = d3
+      .select('body')
+      .append('div')
+      .attr('class', 'tooltip')
+      .style('opacity', 0);
+
+    const dividendSymbol = svg
+      .selectAll('dividend')
+      .data(dividendData)
+      .enter()
+      .append('g')
+      .attr('class', 'dividend-group')
+      .attr('transform', (d, i) => {
+        return `translate(${this.xScale(d['date'])},${this.height - 80})`;
+      })
+      .on('mousemove', d => {
+        dividendTooltip
+          .style('opacity', 1)
+          .style('color', '#464e56')
+          .style('left', d3.event.pageX - 80 + 'px')
+          .style('top', d3.event.pageY - 50 + 'px')
+          .html(
+            `<strong>Dividends: ${d['yield']}</strong> <br/> Date: ${d[
+              'date'
+            ].toLocaleDateString()}`
+          );
+      })
+      .on('mouseout', function(d) {
+        dividendTooltip
+          .transition()
+          .duration(200)
+          .style('opacity', 0);
+      });
+
+    dividendSymbol
+      .append('path')
+      .attr('class', 'dividend')
+      .attr(
+        'd',
+        d3
+          .symbol()
+          .size(300)
+          .type(d3.symbolSquare)
+      )
+      .style('cursor', 'pointer')
+      .style('fill', '#00ced1');
+
+    dividendSymbol
+      .append('text')
+      .attr('x', -6)
+      .attr('y', 5)
+      .text(function(d) {
+        return 'D';
+      })
+      .style('cursor', 'pointer')
+      .style('fill', '#464e56');
   }
 
   setDataset(event) {
     this.loadData(event.target.value).then(response => {
       const thisYearStartDate = new Date(2018, 0, 1);
       const thisYearEndDate = new Date(2018, 11, 31);
-      const res = response
+      const res = response['quote']
         .filter(row => row['high'] && row['low'] && row['close'] && row['open'])
         .filter(row => {
           if (row['date']) {
@@ -330,7 +408,7 @@ class HistoricalPriceChart {
             );
           }
         });
-      this.currentData = res;
+      //this.currentData = res;
       this.margin = { top: 50, right: 50, bottom: 50, left: 50 };
       this.width = window.innerWidth - this.margin.left - this.margin.right; // Use the window's width
       this.height = window.innerHeight - this.margin.top - this.margin.bottom; // Use the window's height
@@ -441,7 +519,7 @@ class HistoricalPriceChart {
         });
 
       //select
-      const overlay = chart.selectAll('.overlay').data(this.currentData);
+      const overlay = chart.selectAll('.overlay').data(res);
 
       //remove old crosshair
       overlay.exit().remove();
@@ -467,9 +545,9 @@ class HistoricalPriceChart {
         //returns corresponding value from the domain
         const correspondingDate = that.xScale.invert(d3.mouse(this)[0]);
         //gets insertion point
-        const i = bisectDate(that.currentData, correspondingDate, 1);
-        const d0 = that.currentData[i - 1];
-        const d1 = that.currentData[i];
+        const i = bisectDate(res, correspondingDate, 1);
+        const d0 = res[i - 1];
+        const d1 = res[i];
         const currentPoint =
           correspondingDate - d0['date'] > d1['date'] - correspondingDate
             ? d1
@@ -498,6 +576,83 @@ class HistoricalPriceChart {
         // updates the legend to display the date, open, close, high, low, and volume and selected mouseover area
         that.updateLegends(currentPoint);
       }
+
+      // get dividend data for current dataset
+      const dividendData = response['dividends'].filter(row => {
+        if (row['date']) {
+          return (
+            row['date'] >= thisYearStartDate && row['date'] <= thisYearEndDate
+          );
+        }
+      });
+
+      const dividendSelect = d3
+        .select('#chart')
+        .select('g')
+        .selectAll('.dividend-group')
+        .data(dividendData);
+
+      const dividendTooltip = d3
+        .select('body')
+        .append('div')
+        .attr('class', 'tooltip')
+        .style('opacity', 0);
+
+      dividendSelect.exit().remove();
+
+      const dividendsEnter = dividendSelect
+        .enter()
+        .append('g')
+        .attr('class', 'dividend-group')
+        .on('mousemove', d => {
+          dividendTooltip
+            .style('opacity', 1)
+            .style('color', '#464e56')
+            .style('left', d3.event.pageX - 80 + 'px')
+            .style('top', d3.event.pageY - 50 + 'px')
+            .html(
+              `<strong>Dividends: ${d['yield']}</strong> <br/> Date: ${d[
+                'date'
+              ].toLocaleDateString()}`
+            );
+        })
+        .on('mouseout', function(d) {
+          dividendTooltip
+            .transition()
+            .duration(200)
+            .style('opacity', 0);
+        });
+
+      dividendsEnter
+        .append('path')
+        .attr('class', 'dividend')
+        .attr(
+          'd',
+          d3
+            .symbol()
+            .size(300)
+            .type(d3.symbolSquare)
+        )
+        .style('cursor', 'pointer')
+        .style('fill', '#00ced1');
+
+      dividendsEnter
+        .append('text')
+        .attr('x', -6)
+        .attr('y', 5)
+        .text(function(d) {
+          return 'D';
+        })
+        .style('cursor', 'pointer')
+        .style('fill', '#464e56');
+
+      dividendsEnter
+        .merge(dividendSelect)
+        .transition()
+        .duration(200)
+        .attr('transform', (d, i) => {
+          return `translate(${this.xScale(d['date'])},${this.height - 80})`;
+        });
     });
   }
 

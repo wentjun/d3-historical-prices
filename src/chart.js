@@ -327,28 +327,8 @@ class HistoricalPriceChart {
     */
 
     /* scatter plot depicting dividend yield */
-    /*
-    svg
-      .selectAll('dividend')
-      .data(data)
-      .enter()
-      .append('path')
-      .attr('class', 'dividend')
-      .attr('d', d3.symbol().type('d3.symbolSquare'))
-      .attr(
-        'transform',
-        d =>
-          'translate(' +
-          this.xScale(d['date']) +
-          ',' +
-          this.yScale(d['close']) +
-          ')'
-      );
-      */
-    //const thisYearStartDate = new Date(2018, 0, 1);
-    //const thisYearEndDate = new Date(2018, 11, 31);
 
-    // filter out data based on time period
+    // get dividend data for year of 2018
     const dividendData = this.currentData['dividends'].filter(row => {
       if (row['date']) {
         return (
@@ -356,11 +336,13 @@ class HistoricalPriceChart {
         );
       }
     });
-    const div = d3
+
+    const dividendTooltip = d3
       .select('body')
       .append('div')
       .attr('class', 'tooltip')
       .style('opacity', 0);
+
     const dividendSymbol = svg
       .selectAll('dividend')
       .data(dividendData)
@@ -371,19 +353,19 @@ class HistoricalPriceChart {
         return `translate(${this.xScale(d['date'])},${this.height - 80})`;
       })
       .on('mousemove', d => {
-        div
+        dividendTooltip
           .style('opacity', 1)
           .style('color', '#464e56')
           .style('left', d3.event.pageX - 80 + 'px')
-          .style('top', d3.event.pageY - 50 + 'px');
-        div.html(
-          `<strong>Dividends: ${d['yield']}</strong> <br/> Date: ${d[
-            'date'
-          ].toLocaleDateString()}`
-        );
+          .style('top', d3.event.pageY - 50 + 'px')
+          .html(
+            `<strong>Dividends: ${d['yield']}</strong> <br/> Date: ${d[
+              'date'
+            ].toLocaleDateString()}`
+          );
       })
       .on('mouseout', function(d) {
-        div
+        dividendTooltip
           .transition()
           .duration(200)
           .style('opacity', 0);
@@ -400,7 +382,7 @@ class HistoricalPriceChart {
           .type(d3.symbolSquare)
       )
       .style('cursor', 'pointer')
-      .style('fill', 'darkgrey');
+      .style('fill', '#00ced1');
 
     dividendSymbol
       .append('text')
@@ -410,7 +392,7 @@ class HistoricalPriceChart {
         return 'D';
       })
       .style('cursor', 'pointer')
-      .style('fill', 'white');
+      .style('fill', '#464e56');
   }
 
   setDataset(event) {
@@ -595,7 +577,7 @@ class HistoricalPriceChart {
         that.updateLegends(currentPoint);
       }
 
-      // update dividend yield
+      // get dividend data for current dataset
       const dividendData = response['dividends'].filter(row => {
         if (row['date']) {
           return (
@@ -603,35 +585,39 @@ class HistoricalPriceChart {
           );
         }
       });
-      const dividends = d3
+
+      const dividendSelect = d3
         .select('#chart')
         .select('g')
         .selectAll('.dividend-group')
-        .data(dividendData, d => d['date']);
-      const div = d3
+        .data(dividendData);
+
+      const dividendTooltip = d3
         .select('body')
         .append('div')
         .attr('class', 'tooltip')
         .style('opacity', 0);
-      dividends.exit().remove();
-      const dividendsEnter = dividends
+
+      dividendSelect.exit().remove();
+
+      const dividendsEnter = dividendSelect
         .enter()
         .append('g')
         .attr('class', 'dividend-group')
         .on('mousemove', d => {
-          div
+          dividendTooltip
             .style('opacity', 1)
             .style('color', '#464e56')
             .style('left', d3.event.pageX - 80 + 'px')
-            .style('top', d3.event.pageY - 50 + 'px');
-          div.html(
-            `<strong>Dividends: ${d['yield']}</strong> <br/> Date: ${d[
-              'date'
-            ].toLocaleDateString()}`
-          );
+            .style('top', d3.event.pageY - 50 + 'px')
+            .html(
+              `<strong>Dividends: ${d['yield']}</strong> <br/> Date: ${d[
+                'date'
+              ].toLocaleDateString()}`
+            );
         })
         .on('mouseout', function(d) {
-          div
+          dividendTooltip
             .transition()
             .duration(200)
             .style('opacity', 0);
@@ -648,7 +634,7 @@ class HistoricalPriceChart {
             .type(d3.symbolSquare)
         )
         .style('cursor', 'pointer')
-        .style('fill', 'darkgrey');
+        .style('fill', '#00ced1');
 
       dividendsEnter
         .append('text')
@@ -658,11 +644,15 @@ class HistoricalPriceChart {
           return 'D';
         })
         .style('cursor', 'pointer')
-        .style('fill', 'white');
+        .style('fill', '#464e56');
 
-      dividendsEnter.merge(dividends).attr('transform', (d, i) => {
-        return `translate(${this.xScale(d['date'])},${this.height - 80})`;
-      });
+      dividendsEnter
+        .merge(dividendSelect)
+        .transition()
+        .duration(200)
+        .attr('transform', (d, i) => {
+          return `translate(${this.xScale(d['date'])},${this.height - 80})`;
+        });
     });
   }
 

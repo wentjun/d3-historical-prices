@@ -8,7 +8,6 @@ class HistoricalPriceChart {
     this.currentData = {};
 
     this.loadData('vig').then(data => {
-      console.log(data);
       this.currentData = data;
       this.initialiseChart();
     });
@@ -32,24 +31,7 @@ class HistoricalPriceChart {
     return d3.json(loadFile).then(data => {
       const chartResultsData = data['chart']['result'][0];
       const quoteData = chartResultsData['indicators']['quote'][0];
-      /*
-      console.log(
-        Object.values(chartResultsData['events']['dividends']).map(res => {
-          return {
-            date: new Date(res['date'] * 1000),
-            yield: res['amount']
-          };
-        })
-      );
-      return chartResultsData['timestamp'].map((time, index) => ({
-        date: new Date(time * 1000),
-        high: quoteData['high'][index],
-        low: quoteData['low'][index],
-        open: quoteData['open'][index],
-        close: quoteData['close'][index],
-        volume: quoteData['volume'][index]
-      }));
-      */
+
       return {
         dividends: Object.values(chartResultsData['events']['dividends']).map(
           res => {
@@ -374,7 +356,6 @@ class HistoricalPriceChart {
         );
       }
     });
-    console.log(dividendData);
     const div = d3
       .select('body')
       .append('div')
@@ -385,6 +366,10 @@ class HistoricalPriceChart {
       .data(dividendData)
       .enter()
       .append('g')
+      .attr('class', 'dividend-group')
+      .attr('transform', (d, i) => {
+        return `translate(${this.xScale(d['date'])},${this.height - 80})`;
+      })
       .on('mousemove', d => {
         div
           .style('opacity', 1)
@@ -400,7 +385,7 @@ class HistoricalPriceChart {
       .on('mouseout', function(d) {
         div
           .transition()
-          .duration(500)
+          .duration(200)
           .style('opacity', 0);
       });
 
@@ -414,9 +399,6 @@ class HistoricalPriceChart {
           .size(300)
           .type(d3.symbolSquare)
       )
-      .attr('transform', (d, i) => {
-        return `translate(${this.xScale(d['date'])},${this.height - 80})`;
-      })
       .style('cursor', 'pointer')
       .style('fill', 'darkgrey');
 
@@ -427,26 +409,8 @@ class HistoricalPriceChart {
       .text(function(d) {
         return 'D';
       })
-      .attr('transform', (d, i) => {
-        return `translate(${this.xScale(d['date'])},${this.height - 80})`;
-      })
       .style('cursor', 'pointer')
       .style('fill', 'white');
-
-    /*
-    svg
-      .selectAll('dividend-text')
-      .data(dividendData)
-      .enter()
-      .append('text')
-      .style('color', 'white')
-      .text(function(d) {
-        return 'D';
-      })
-      .attr('transform', (d, i) => {
-        return `translate(${this.xScale(d['date'])},${this.height - 50})`;
-      });
-      */
   }
 
   setDataset(event) {
@@ -630,6 +594,75 @@ class HistoricalPriceChart {
         // updates the legend to display the date, open, close, high, low, and volume and selected mouseover area
         that.updateLegends(currentPoint);
       }
+
+      // update dividend yield
+      const dividendData = response['dividends'].filter(row => {
+        if (row['date']) {
+          return (
+            row['date'] >= thisYearStartDate && row['date'] <= thisYearEndDate
+          );
+        }
+      });
+      const dividends = d3
+        .select('#chart')
+        .select('g')
+        .selectAll('.dividend-group')
+        .data(dividendData, d => d['date']);
+      const div = d3
+        .select('body')
+        .append('div')
+        .attr('class', 'tooltip')
+        .style('opacity', 0);
+      dividends.exit().remove();
+      const dividendsEnter = dividends
+        .enter()
+        .append('g')
+        .attr('class', 'dividend-group')
+        .on('mousemove', d => {
+          div
+            .style('opacity', 1)
+            .style('color', '#464e56')
+            .style('left', d3.event.pageX - 80 + 'px')
+            .style('top', d3.event.pageY - 50 + 'px');
+          div.html(
+            `<strong>Dividends: ${d['yield']}</strong> <br/> Date: ${d[
+              'date'
+            ].toLocaleDateString()}`
+          );
+        })
+        .on('mouseout', function(d) {
+          div
+            .transition()
+            .duration(200)
+            .style('opacity', 0);
+        });
+
+      dividendsEnter
+        .append('path')
+        .attr('class', 'dividend')
+        .attr(
+          'd',
+          d3
+            .symbol()
+            .size(300)
+            .type(d3.symbolSquare)
+        )
+        .style('cursor', 'pointer')
+        .style('fill', 'darkgrey');
+
+      dividendsEnter
+        .append('text')
+        .attr('x', -6)
+        .attr('y', 5)
+        .text(function(d) {
+          return 'D';
+        })
+        .style('cursor', 'pointer')
+        .style('fill', 'white');
+
+      dividendsEnter.merge(dividends).attr('transform', (d, i) => {
+        return `translate(${this.xScale(d['date'])},${this.height - 80})`;
+      });
     });
   }
 

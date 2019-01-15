@@ -64,3 +64,11 @@ body {
 a {
   color: #67809f;
 }
+
+@media screen and (max-width: 768px) {
+  .flex-container {
+    -webkit-flex-flow: column-reverse nowrap;
+    justify-content: flex-start;
+    align-items: center;
+  }
+}

@@ -202,6 +202,7 @@ class HistoricalPriceChart {
       .style('fill', 'none')
       .attr('id', 'priceChart')
       .attr('stroke', 'steelblue')
+      .attr('stroke-width', '1.5')
       .attr('d', line);
 
     // calculates simple moving average over 50 days
@@ -212,6 +213,7 @@ class HistoricalPriceChart {
       .style('fill', 'none')
       .attr('id', 'movingAverageLine')
       .attr('stroke', '#FF8900')
+      .attr('stroke-width', '1.5')
       .attr('d', movingAverageLine);
 
     // renders x and y crosshair
@@ -381,6 +383,7 @@ class HistoricalPriceChart {
           .size(300)
           .type(d3.symbolSquare)
       )
+      .style('opacity', 0.8)
       .style('cursor', 'pointer')
       .style('fill', '#00ced1');
 
@@ -408,11 +411,12 @@ class HistoricalPriceChart {
             );
           }
         });
-      //this.currentData = res;
+
       this.margin = { top: 50, right: 50, bottom: 50, left: 50 };
       this.width = window.innerWidth - this.margin.left - this.margin.right; // Use the window's width
       this.height = window.innerHeight - this.margin.top - this.margin.bottom; // Use the window's height
 
+      /* update the min, max values, and scales for the axes */
       const xMin = d3.min(res, d => {
         return Math.min(d['date']);
       });
@@ -458,12 +462,14 @@ class HistoricalPriceChart {
         })
         .curve(d3.curveBasis);
 
+      /* update the price chart */
       const svg = d3.select('#chart').transition();
       svg
         .select('#priceChart')
         .duration(750)
         .attr('d', line(res));
 
+      /* update the moving average line */
       const movingAverageData = this.movingAverage(res, 49);
       svg
         .select('#movingAverageLine')
@@ -493,6 +499,7 @@ class HistoricalPriceChart {
 
       bars.exit().remove();
 
+      //enter, and merge the selections. This updates the volume series bars.
       bars
         .enter()
         .append('rect')
@@ -518,16 +525,16 @@ class HistoricalPriceChart {
           return this.height - yVolumeScale(d['volume']);
         });
 
-      //select
+      /* updating of crosshair */
+      // select the existing crosshair, and bind new data
       const overlay = chart.selectAll('.overlay').data(res);
 
-      //remove old crosshair
+      // remove old crosshair
       overlay.exit().remove();
 
-      //add crosshair
+      // enter, and update the attributes
       overlay.enter();
 
-      //update crosshair
       overlay
         .attr('class', 'overlay')
         .attr('width', this.width)
@@ -577,6 +584,7 @@ class HistoricalPriceChart {
         that.updateLegends(currentPoint);
       }
 
+      /* updating of dividends */
       // get dividend data for current dataset
       const dividendData = response['dividends'].filter(row => {
         if (row['date']) {
@@ -586,6 +594,7 @@ class HistoricalPriceChart {
         }
       });
 
+      // select all dividend groups, and bind the new data
       const dividendSelect = d3
         .select('#chart')
         .select('g')
@@ -600,6 +609,7 @@ class HistoricalPriceChart {
 
       dividendSelect.exit().remove();
 
+      // first, enter and append the group element, with the mousemove and mouseout events
       const dividendsEnter = dividendSelect
         .enter()
         .append('g')
@@ -623,6 +633,7 @@ class HistoricalPriceChart {
             .style('opacity', 0);
         });
 
+      // enter and append the square symbols representing the dividents to the group element
       dividendsEnter
         .append('path')
         .attr('class', 'dividend')
@@ -633,9 +644,11 @@ class HistoricalPriceChart {
             .size(300)
             .type(d3.symbolSquare)
         )
+        .style('opacity', 0.8)
         .style('cursor', 'pointer')
         .style('fill', '#00ced1');
 
+      // enter and append the 'D' text to the group element
       dividendsEnter
         .append('text')
         .attr('x', -6)
@@ -646,6 +659,7 @@ class HistoricalPriceChart {
         .style('cursor', 'pointer')
         .style('fill', '#464e56');
 
+      // update the group element by merging the selections, and translating the elements to their respective positions
       dividendsEnter
         .merge(dividendSelect)
         .transition()
@@ -687,6 +701,7 @@ class HistoricalPriceChart {
           return `${d}: ${currentPoint[d]}`;
         }
       })
+      .style('font-size', '0.8em')
       .style('fill', 'white')
       .attr('transform', 'translate(15,9)'); //align texts with boxes
   }

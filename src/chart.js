@@ -468,17 +468,17 @@ class HistoricalPriceChart {
     };
 
     const ohlc = selection => {
+      const tickWidth = 5;
       console.log(selection);
       const series = svg
         .select('.series')
         .selectAll('.ohlc-series')
-        .data(data);
-      const ohlcSeries = series
+        .data(data)
         .enter()
         .append('g')
         .classed('ohlc-series', true);
 
-      ohlcSeries
+      const intradayRange = series
         .append('g')
         .classed('bar', true)
         .classed('up-day', function(d) {
@@ -490,12 +490,31 @@ class HistoricalPriceChart {
         .append('path')
         .classed('high-low-line', true)
         .attr('d', d => {
-          //console.log(d);
           return lineOHLC([
             { x: this.xScale(d.date), y: this.yScale(d.high) },
             { x: this.xScale(d.date), y: this.yScale(d.low) }
           ]);
         });
+
+      d3.selectAll('.bar')
+        .append('path')
+        .classed('open-tick', true)
+        .attr('d', d => {
+          return lineOHLC([
+            { x: this.xScale(d.date) - tickWidth, y: this.yScale(d.open) },
+            { x: this.xScale(d.date), y: this.yScale(d.open) }
+          ]);
+        });
+      d3.selectAll('.bar')
+        .append('path')
+        .classed('close-tick', true)
+        .attr('d', d => {
+          return lineOHLC([
+            { x: this.xScale(d.date), y: this.yScale(d.close) },
+            { x: this.xScale(d.date) + tickWidth, y: this.yScale(d.close) }
+          ]);
+        });
+
       console.log(series);
       /*
       selection.each(function(data) {

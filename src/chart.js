@@ -291,15 +291,9 @@ class HistoricalPriceChart {
         return Math.max(d["close"]);
       });
 
-      this.xScale = d3
-        .scaleTime()
-        .domain([xMin, xMax])
-        .range([0, this.width]);
+      this.xScale.domain([xMin, xMax]);
 
-      this.yScale = d3
-        .scaleLinear()
-        .domain([yMin - 5, yMax])
-        .range([this.height, 0]);
+      this.yScale.domain([yMin - 5, yMax]);
 
       // get dividend data for current dataset
       const dividendData = response["dividends"].filter(row => {
@@ -328,25 +322,23 @@ class HistoricalPriceChart {
 
     const svg = d3.select("#chart").transition();
 
-    /* update the price chart */
+    /* Update the price chart */
     svg
       .select("#priceChart")
       .duration(750)
       .attr("d", line(filteredData));
 
-    /* update the moving average line */
+    /* Update the moving average line */
     const movingAverageData = this.movingAverage(filteredData, 49);
     svg
       .select("#movingAverageLine")
       .duration(750)
       .attr("d", movingAverageLine(movingAverageData));
 
-    d3.selectAll("#xAxis")
-      .attr("transform", `translate(0, ${this.height})`)
-      .call(d3.axisBottom(this.xScale));
-    d3.selectAll("#yAxis")
-      .attr("transform", `translate(${this.width}, 0)`)
-      .call(d3.axisRight(this.yScale));
+    /* Update the axis */
+
+    d3.select("#xAxis").call(d3.axisBottom(this.xScale));
+    d3.select("#yAxis").call(d3.axisRight(this.yScale));
 
     /* Update the volume series */
     const chart = d3.select("#chart").select("g");
@@ -386,8 +378,7 @@ class HistoricalPriceChart {
 
     /* updating of crosshair */
     // select the existing crosshair, and bind new data
-    //const overlay = chart.selectAll(".overlay").data(filteredData);
-    const overlay = d3.selectAll(".overlay");
+    const overlay = d3.select(".overlay");
 
     // remove old crosshair
     overlay.exit().remove();
@@ -411,7 +402,8 @@ class HistoricalPriceChart {
     const bisectDate = d3.bisector(d => d.date).left;
 
     const that = this;
-    /* mouseover function to generate crosshair */
+
+    /* Mouseover function to generate crosshair */
     function generateCrosshair() {
       //returns corresponding value from the domain
       const correspondingDate = that.xScale.invert(d3.mouse(this)[0]);
@@ -448,8 +440,7 @@ class HistoricalPriceChart {
       that.updateLegends(currentPoint);
     }
 
-    /* updating of dividends */
-
+    /* Updating of dividends */
     // select all dividend groups, and bind the new data
     const dividendSelect = d3
       .select("#chart")
@@ -524,17 +515,17 @@ class HistoricalPriceChart {
       );
   }
   updateLegends(currentPoint) {
-    d3.selectAll(".lineLegend").remove();
+    d3.selectAll(".line-legend").remove();
 
     const legendKeys = Object.keys(currentPoint);
     const lineLegend = d3
       .select("#chart")
       .select("g")
-      .selectAll(".lineLegend")
+      .selectAll(".line-legend")
       .data(legendKeys)
       .enter()
       .append("g")
-      .attr("class", "lineLegend")
+      .attr("class", "line-legend")
       .attr("transform", (d, i) => {
         return `translate(0, ${i * 20})`;
       });

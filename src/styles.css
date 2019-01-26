@@ -65,6 +65,14 @@ a {
   color: #67809f;
 }
 
+#chart .bar.up-day path {
+  stroke: green;
+}
+
+#chart .bar.down-day path {
+  stroke: red;
+}
+
 @media screen and (max-width: 768px) {
   .flex-container {
     -webkit-flex-flow: column-reverse nowrap;

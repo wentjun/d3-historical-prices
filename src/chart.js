@@ -16,6 +16,20 @@ class HistoricalPriceChart {
       this.setDataset(event);
     });
 
+    const viewClose = document.querySelector('input[id=close]');
+    viewClose.addEventListener('change', event => {
+      this.toggleClose(document.querySelector('input[id=close]').checked);
+    });
+
+    const viewMovingAverage = document.querySelector(
+      'input[id=moving-average]'
+    );
+    viewMovingAverage.addEventListener('change', event => {
+      this.toggleMovingAverage(
+        document.querySelector('input[id=moving-average]').checked
+      );
+    });
+
     const viewOHLC = document.querySelector('input[id=ohlc]');
     viewOHLC.addEventListener('change', event => {
       this.toggleOHLC(document.querySelector('input[id=ohlc]').checked);
@@ -167,40 +181,6 @@ class HistoricalPriceChart {
       .attr('transform', `translate(${this.width}, 0)`)
       .call(d3.axisRight(this.yScale));
 
-    // renders close price line chart and moving average line chart
-
-    // generates lines when called
-    const line = d3
-      .line()
-      .x(d => this.xScale(d['date']))
-      .y(d => this.yScale(d['close']));
-
-    const movingAverageLine = d3
-      .line()
-      .x(d => this.xScale(d['date']))
-      .y(d => this.yScale(d['average']))
-      .curve(d3.curveBasis);
-
-    svg
-      .append('path')
-      .data([this.currentData]) // binds data to the line
-      .style('fill', 'none')
-      .attr('id', 'priceChart')
-      .attr('stroke', 'steelblue')
-      .attr('stroke-width', '1.5')
-      .attr('d', line);
-
-    // calculates simple moving average over 50 days
-    const movingAverageData = this.movingAverage(this.currentData, 49);
-    svg
-      .append('path')
-      .data([movingAverageData])
-      .style('fill', 'none')
-      .attr('id', 'movingAverageLine')
-      .attr('stroke', '#FF8900')
-      .attr('stroke-width', '1.5')
-      .attr('d', movingAverageLine);
-
     // define x and y crosshair properties
     const focus = svg
       .append('g')
@@ -279,34 +259,18 @@ class HistoricalPriceChart {
   }
 
   updateChart(dividendData) {
-    const line = d3
-      .line()
-      .x(d => this.xScale(d['date']))
-      .y(d => this.yScale(d['close']));
-
-    const movingAverageLine = d3
-      .line()
-      .x(d => this.xScale(d['date']))
-      .y(d => this.yScale(d['average']))
-      .curve(d3.curveBasis);
-
-    const svg = d3.select('#chart').transition();
-
     /* Update the price chart */
-    svg
-      .select('#priceChart')
-      .duration(750)
-      .attr('d', line(this.currentData));
+    const closeCheckboxToggle = document.querySelector('input[id=close]')
+      .checked;
+    this.toggleClose(closeCheckboxToggle);
 
     /* Update the moving average line */
-    const movingAverageData = this.movingAverage(this.currentData, 49);
-    svg
-      .select('#movingAverageLine')
-      .duration(750)
-      .attr('d', movingAverageLine(movingAverageData));
+    const movingAverageCheckboxToggle = document.querySelector(
+      'input[id=moving-average]'
+    ).checked;
+    this.toggleMovingAverage(movingAverageCheckboxToggle);
 
     /* Update the axis */
-
     d3.select('#xAxis').call(d3.axisBottom(this.xScale));
     d3.select('#yAxis').call(d3.axisRight(this.yScale));
 
@@ -525,6 +489,76 @@ class HistoricalPriceChart {
       .attr('transform', 'translate(15,9)'); //align texts with boxes
   }
 
+  toggleClose(value) {
+    if (value) {
+      const line = d3
+        .line()
+        .x(d => this.xScale(d['date']))
+        .y(d => this.yScale(d['close']));
+      const lineSelect = d3
+        .select('#chart')
+        .select('svg')
+        .select('g')
+        .selectAll('.priceChart')
+        .data([this.currentData]);
+
+      lineSelect
+        .enter()
+        .append('path')
+        .style('fill', 'none')
+        .attr('class', 'priceChart')
+        .attr('stroke', 'steelblue')
+        .attr('stroke-width', '1.5')
+        .attr('d', line);
+
+      // Update the price chart
+      lineSelect
+        .transition()
+        .duration(750)
+        .attr('d', line);
+    } else {
+      // Remove close price chart
+      d3.select('.priceChart').remove();
+    }
+  }
+
+  toggleMovingAverage(value) {
+    if (value) {
+      // calculates simple moving average over 50 days
+      const movingAverageData = this.movingAverage(this.currentData, 49);
+
+      const movingAverageLine = d3
+        .line()
+        .x(d => this.xScale(d['date']))
+        .y(d => this.yScale(d['average']))
+        .curve(d3.curveBasis);
+      const movingAverageSelect = d3
+        .select('#chart')
+        .select('svg')
+        .select('g')
+        .selectAll('.movingAverageLine')
+        .data([movingAverageData]);
+
+      movingAverageSelect
+        .enter()
+        .append('path')
+        .style('fill', 'none')
+        .attr('class', 'movingAverageLine')
+        .attr('stroke', '#FF8900')
+        .attr('stroke-width', '1.5')
+        .attr('d', movingAverageLine);
+
+      // Update the moving average line
+      movingAverageSelect
+        .transition()
+        .duration(750)
+        .attr('d', movingAverageLine);
+    } else {
+      // Remove moving average line
+      d3.select('.movingAverageLine').remove();
+    }
+  }
+
   toggleOHLC(value) {
     if (value) {
       const tickWidth = 5;
@@ -589,6 +623,7 @@ class HistoricalPriceChart {
           ]);
         });
     } else {
+      // remove OHLC
       d3.select('#chart')
         .select('g')
         .selectAll('.ohlc-series')

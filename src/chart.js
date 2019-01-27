@@ -124,21 +124,10 @@ class HistoricalPriceChart {
     this.height = window.innerHeight - this.margin.top - this.margin.bottom; // Use the window's height
 
     // find data range
-    const xMin = d3.min(data, d => {
-      return d['date'];
-    });
-
-    const xMax = d3.max(data, d => {
-      return d['date'];
-    });
-
-    const yMin = d3.min(data, d => {
-      return d['close'];
-    });
-
-    const yMax = d3.max(data, d => {
-      return d['close'];
-    });
+    const xMin = d3.min(data, d => d['date']);
+    const xMax = d3.max(data, d => d['date']);
+    const yMin = d3.min(data, d => d['close']);
+    const yMax = d3.max(data, d => d['close']);
 
     // scale using range
     this.xScale = d3
@@ -182,21 +171,13 @@ class HistoricalPriceChart {
     // generates lines when called
     const line = d3
       .line()
-      .x(d => {
-        return this.xScale(d['date']);
-      })
-      .y(d => {
-        return this.yScale(d['close']);
-      });
+      .x(d => this.xScale(d['date']))
+      .y(d => this.yScale(d['close']));
 
     const movingAverageLine = d3
       .line()
-      .x(d => {
-        return this.xScale(d['date']);
-      })
-      .y(d => {
-        return this.yScale(d['average']);
-      })
+      .x(d => this.xScale(d['date']))
+      .y(d => this.yScale(d['average']))
       .curve(d3.curveBasis);
 
     svg
@@ -275,24 +256,12 @@ class HistoricalPriceChart {
       this.height = window.innerHeight - this.margin.top - this.margin.bottom; // Use the window's height
 
       /* update the min, max values, and scales for the axes */
-      const xMin = d3.min(filteredData, d => {
-        return Math.min(d['date']);
-      });
-
-      const xMax = d3.max(filteredData, d => {
-        return Math.max(d['date']);
-      });
-
-      const yMin = d3.min(filteredData, d => {
-        return Math.min(d['close']);
-      });
-
-      const yMax = d3.max(filteredData, d => {
-        return Math.max(d['close']);
-      });
+      const xMin = d3.min(filteredData, d => Math.min(d['date']));
+      const xMax = d3.max(filteredData, d => Math.max(d['date']));
+      const yMin = d3.min(filteredData, d => Math.min(d['close']));
+      const yMax = d3.max(filteredData, d => Math.max(d['close']));
 
       this.xScale.domain([xMin, xMax]);
-
       this.yScale.domain([yMin - 5, yMax]);
 
       // get dividend data for current dataset
@@ -525,7 +494,9 @@ class HistoricalPriceChart {
       .select('#chart')
       .select('g')
       .selectAll('.ohlc-series')
-      .data(filteredData, d => console.log(d));
+      .data(filteredData, d => d['volume']);
+
+    ohlcSelection.exit().remove();
 
     const ohlcEnter = ohlcSelection
       .enter()
@@ -533,12 +504,8 @@ class HistoricalPriceChart {
       .attr('class', 'ohlc-series')
       .append('g')
       .attr('class', 'bars')
-      .classed('up-day', function(d) {
-        return d['close'] > d['open'];
-      })
-      .classed('down-day', function(d) {
-        return d['close'] <= d['open'];
-      });
+      .classed('up-day', d => d['close'] > d['open'])
+      .classed('down-day', d => d['close'] <= d['open']);
 
     // intraday range represented by vertical line
     ohlcEnter
@@ -572,8 +539,6 @@ class HistoricalPriceChart {
           { x: this.xScale(d['date']) + tickWidth, y: this.yScale(d['close']) }
         ]);
       });
-
-    ohlcSelection.exit().remove();
   }
 
   updateLegends(currentPoint) {
@@ -588,9 +553,7 @@ class HistoricalPriceChart {
       .enter()
       .append('g')
       .attr('class', 'line-legend')
-      .attr('transform', (d, i) => {
-        return `translate(0, ${i * 20})`;
-      });
+      .attr('transform', (d, i) => `translate(0, ${i * 20})`);
     lineLegend
       .append('text')
       .text(d => {

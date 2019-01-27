@@ -252,165 +252,6 @@ class HistoricalPriceChart {
       }
     });
 
-    const isUpDay = function(d) {
-      return d.close > d.open;
-    };
-    const isDownDay = function(d) {
-      return !isUpDay(d);
-    };
-
-    const lineOHLC = d3
-      .line()
-      .x(function(d) {
-        return d.x;
-      })
-      .y(function(d) {
-        return d.y;
-      });
-
-    const highLowLines = bars => {
-      console.log(bars);
-      console.log(svg.selectAll('bar'));
-      var paths = svg
-        .selectAll('bar')
-        .select('.high-low-line')
-        .data(data, d => {
-          console.log(d);
-          return [d];
-        });
-      console.log(paths);
-
-      paths.enter().append('path');
-      /*
-      paths.classed('high-low-line', true).attr('d', d => {
-        return lineOHLC([
-          { x: this.xScale(d.date), y: this.yScale(d.high) },
-          { x: this.xScale(d.date), y: this.yScale(d.low) }
-        ]);
-      });
-      */
-    };
-
-    var openCloseTicks = bars => {
-      const open = bars.selectAll('.open-tick').data(function(d) {
-        return [d];
-      });
-      console.log(bars);
-      const close = bars.selectAll('.close-tick').data(function(d) {
-        return [d];
-      });
-
-      open.enter().append('path');
-      close.enter().append('path');
-
-      open.classed('open-tick', true).attr('d', function(d) {
-        return lineOHLC([
-          { x: this.xScale(d.date) - tickWidth, y: this.yScale(d.open) },
-          { x: this.xScale(d.date), y: this.yScale(d.open) }
-        ]);
-      });
-
-      close.classed('close-tick', true).attr('d', function(d) {
-        return lineOHLC([
-          { x: this.xScale(d.date), y: this.yScale(d.close) },
-          { x: this.xScale(d.date) + tickWidth, y: this.yScale(d.close) }
-        ]);
-      });
-
-      open.exit().remove();
-      close.exit().remove();
-    };
-
-    const ohlc = selection => {
-      const tickWidth = 5;
-      console.log(selection);
-      const series = svg
-        .select('.series')
-        .selectAll('.ohlc-series')
-        .data(data)
-        .enter()
-        .append('g')
-        .classed('ohlc-series', true);
-
-      const intradayRange = series
-        .append('g')
-        .classed('bar', true)
-        .classed('up-day', function(d) {
-          return d.close > d.open;
-        })
-        .classed('down-day', function(d) {
-          return d.close <= d.open;
-        })
-        .append('path')
-        .classed('high-low-line', true)
-        .attr('d', d => {
-          return lineOHLC([
-            { x: this.xScale(d.date), y: this.yScale(d.high) },
-            { x: this.xScale(d.date), y: this.yScale(d.low) }
-          ]);
-        });
-
-      d3.selectAll('.bar')
-        .append('path')
-        .classed('open-tick', true)
-        .attr('d', d => {
-          return lineOHLC([
-            { x: this.xScale(d.date) - tickWidth, y: this.yScale(d.open) },
-            { x: this.xScale(d.date), y: this.yScale(d.open) }
-          ]);
-        });
-      d3.selectAll('.bar')
-        .append('path')
-        .classed('close-tick', true)
-        .attr('d', d => {
-          return lineOHLC([
-            { x: this.xScale(d.date), y: this.yScale(d.close) },
-            { x: this.xScale(d.date) + tickWidth, y: this.yScale(d.close) }
-          ]);
-        });
-
-      console.log(series);
-      /*
-      selection.each(function(data) {
-        // series = d3.select(this);
-        //console.log(svg);
-        const series = svg.selectAll('.ohlc-series').data(data);
-
-        series
-          .enter()
-          .append('g')
-          .classed('ohlc-series', true);
-        console.log(series);
-        const bars = svg.selectAll('.bar').data(data, d => {
-          return d.date;
-        });
-        console.log(bars);
-        bars
-          .enter()
-          .append('g')
-          .classed('bar', true)
-          .classed('up-day', function(d) {
-            return d.close > d.open;
-          })
-          .classed('down-day', function(d) {
-            return d.close <= d.open;
-          });
-        console.log(bars);
-
-        //highLowLines(bars);
-        //openCloseTicks(bars);
-
-        bars.exit().remove();
-      });
-      */
-    };
-
-    svg
-      .append('g')
-      .attr('class', 'series')
-      .datum(data)
-      .call(ohlc);
-      
     // generates the rest of the graph
     this.updateChart(data, dividendData);
   }
@@ -672,7 +513,69 @@ class HistoricalPriceChart {
         'transform',
         (d, i) => `translate(${this.xScale(d['date'])},${this.height - 80})`
       );
+
+    /* OHLC chart */
+    const tickWidth = 5;
+    const ohlcLine = d3
+      .line()
+      .x(d => d['x'])
+      .y(d => d['y']);
+
+    const ohlcSelection = d3
+      .select('#chart')
+      .select('g')
+      .selectAll('.ohlc-series')
+      .data(filteredData, d => console.log(d));
+
+    const ohlcEnter = ohlcSelection
+      .enter()
+      .append('g')
+      .attr('class', 'ohlc-series')
+      .append('g')
+      .attr('class', 'bars')
+      .classed('up-day', function(d) {
+        return d['close'] > d['open'];
+      })
+      .classed('down-day', function(d) {
+        return d['close'] <= d['open'];
+      });
+
+    // intraday range represented by vertical line
+    ohlcEnter
+      .append('path')
+      .classed('high-low-line', true)
+      .attr('d', d => {
+        return ohlcLine([
+          { x: this.xScale(d['date']), y: this.yScale(d['high']) },
+          { x: this.xScale(d['date']), y: this.yScale(d['low']) }
+        ]);
+      });
+
+    // open price represented by left horizontal line
+    ohlcEnter
+      .append('path')
+      .classed('open-tick', true)
+      .attr('d', d => {
+        return ohlcLine([
+          { x: this.xScale(d['date']) - tickWidth, y: this.yScale(d['open']) },
+          { x: this.xScale(d['date']), y: this.yScale(d['open']) }
+        ]);
+      });
+
+    // close price represented by right horizontal line
+    ohlcEnter
+      .append('path')
+      .classed('close-tick', true)
+      .attr('d', d => {
+        return ohlcLine([
+          { x: this.xScale(d['date']), y: this.yScale(d['close']) },
+          { x: this.xScale(d['date']) + tickWidth, y: this.yScale(d['close']) }
+        ]);
+      });
+
+    ohlcSelection.exit().remove();
   }
+
   updateLegends(currentPoint) {
     d3.selectAll('.line-legend').remove();
 

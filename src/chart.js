@@ -453,6 +453,8 @@ class HistoricalPriceChart {
     /* display OHLC chart */
     const checkboxToggle = document.querySelector('input[id=ohlc]').checked;
     this.toggleOHLC(checkboxToggle);
+
+    this.toggleCandlesticks(true);
   }
 
   updateLegends(currentPoint) {
@@ -628,6 +630,63 @@ class HistoricalPriceChart {
         .select('g')
         .selectAll('.ohlc-series')
         .remove();
+    }
+  }
+
+  toggleCandlesticks(value) {
+    if (value) {
+      console.log(value);
+      const bodyWidth = 5;
+      const candlesticksLine = d3
+        .line()
+        .x(function(d) {
+          return d.x;
+        })
+        .y(function(d) {
+          return d.y;
+        });
+      const candlesticksSelection = d3
+        .select('#chart')
+        .select('g')
+        .selectAll('.candlesticks-series')
+        .data(this.currentData, d => d['volume']);
+
+      //candlesticksSelection.exit().remove();
+
+      const candlesticksEnter = candlesticksSelection
+        .enter()
+        .append('g')
+        .attr('class', 'candlesticks-series')
+        .append('g')
+        .attr('class', 'bars')
+        .classed('up-day', d => d['close'] > d['open'])
+        .classed('down-day', d => d['close'] <= d['open']);
+
+      candlesticksEnter
+        .append('path')
+        .classed('high-low-line', true)
+        .attr('d', d => {
+          return candlesticksLine([
+            { x: this.xScale(d['date']), y: this.yScale(d['high']) },
+            { x: this.xScale(d['date']), y: this.yScale(d['low']) }
+          ]);
+        });
+
+      candlesticksEnter
+        .append('rect')
+        .attr('x', d => this.xScale(d.date) - bodyWidth / 2)
+        .attr('y', d => {
+          return d['close'] > d['open']
+            ? this.yScale(d.close)
+            : this.yScale(d.open);
+        })
+        .attr('width', bodyWidth)
+        .attr('height', d => {
+          return d['close'] > d['open']
+            ? this.yScale(d.open) - this.yScale(d.close)
+            : this.yScale(d.close) - this.yScale(d.open);
+        });
+    } else {
     }
   }
 }

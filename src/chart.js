@@ -8,13 +8,38 @@ class HistoricalPriceChart {
     this.currentData = {};
 
     this.loadData('vig').then(data => {
-      this.currentData = data;
-      this.initialiseChart();
+      this.initialiseChart(data);
     });
 
     const selectElement = document.getElementById('select-stock');
     selectElement.addEventListener('change', event => {
       this.setDataset(event);
+    });
+
+    const viewClose = document.querySelector('input[id=close]');
+    viewClose.addEventListener('change', event => {
+      this.toggleClose(document.querySelector('input[id=close]').checked);
+    });
+
+    const viewMovingAverage = document.querySelector(
+      'input[id=moving-average]'
+    );
+    viewMovingAverage.addEventListener('change', event => {
+      this.toggleMovingAverage(
+        document.querySelector('input[id=moving-average]').checked
+      );
+    });
+
+    const viewOHLC = document.querySelector('input[id=ohlc]');
+    viewOHLC.addEventListener('change', event => {
+      this.toggleOHLC(document.querySelector('input[id=ohlc]').checked);
+    });
+
+    const viewCandlesticks = document.querySelector('input[id=candlesticks]');
+    viewCandlesticks.addEventListener('change', event => {
+      this.toggleCandlesticks(
+        document.querySelector('input[id=candlesticks]').checked
+      );
     });
   }
 
@@ -83,7 +108,12 @@ class HistoricalPriceChart {
       var targetWidth = parseInt(container.style('width'));
       var targetHeight = parseInt(container.style('height'));
       var targetAspect = targetWidth / targetHeight;
-
+      /*
+      if (this) {
+        this.width = targetWidth;
+        this.height = Math.round(targetWidth / targetAspect);
+      }
+      */
       svg.attr('width', targetWidth);
       svg.attr('height', Math.round(targetWidth / targetAspect));
     };
@@ -102,43 +132,29 @@ class HistoricalPriceChart {
     d3.select(window).on('resize.' + container.attr('id'), resize);
   }
 
-  initialiseChart() {
-    let data = this.currentData['quote'].filter(
-      row => row['high'] && row['low'] && row['close'] && row['open']
-    );
-
+  initialiseChart(data) {
     const thisYearStartDate = new Date(2018, 0, 1);
     const thisYearEndDate = new Date(2018, 11, 31);
-
     // filter out data based on time period
-    data = data.filter(row => {
-      if (row['date']) {
-        return (
-          row['date'] >= thisYearStartDate && row['date'] <= thisYearEndDate
-        );
-      }
-    });
+    this.currentData = data['quote']
+      .filter(row => row['high'] && row['low'] && row['close'] && row['open'])
+      .filter(row => {
+        if (row['date']) {
+          return (
+            row['date'] >= thisYearStartDate && row['date'] <= thisYearEndDate
+          );
+        }
+      });
 
-    this.margin = { top: 50, right: 50, bottom: 50, left: 50 };
+    this.margin = { top: 50, right: 40, bottom: 50, left: 60 };
     this.width = window.innerWidth - this.margin.left - this.margin.right; // Use the window's width
     this.height = window.innerHeight - this.margin.top - this.margin.bottom; // Use the window's height
 
     // find data range
-    const xMin = d3.min(data, d => {
-      return d['date'];
-    });
-
-    const xMax = d3.max(data, d => {
-      return d['date'];
-    });
-
-    const yMin = d3.min(data, d => {
-      return d['close'];
-    });
-
-    const yMax = d3.max(data, d => {
-      return d['close'];
-    });
+    const xMin = d3.min(this.currentData, d => d['date']);
+    const xMax = d3.max(this.currentData, d => d['date']);
+    const yMin = d3.min(this.currentData, d => d['close']);
+    const yMax = d3.max(this.currentData, d => d['close']);
 
     // scale using range
     this.xScale = d3
@@ -157,7 +173,7 @@ class HistoricalPriceChart {
       .append('svg')
       .attr('width', this.width + this.margin['left'] + this.margin['right'])
       .attr('height', this.height + this.margin['top'] + this.margin['bottom'])
-      .call(this.responsivefy)
+      //.call(this.responsivefy)
       .append('g')
       .attr(
         'transform',
@@ -176,48 +192,10 @@ class HistoricalPriceChart {
       .attr('id', 'yAxis')
       .attr('transform', `translate(${this.width}, 0)`)
       .call(d3.axisRight(this.yScale));
-
-    // renders close price line chart and moving average line chart
-
-    // generates lines when called
-    const line = d3
-      .line()
-      .x(d => {
-        return this.xScale(d['date']);
-      })
-      .y(d => {
-        return this.yScale(d['close']);
-      });
-
-    const movingAverageLine = d3
-      .line()
-      .x(d => {
-        return this.xScale(d['date']);
-      })
-      .y(d => {
-        return this.yScale(d['average']);
-      })
-      .curve(d3.curveBasis);
-
     svg
-      .append('path')
-      .data([data]) // binds data to the line
-      .style('fill', 'none')
-      .attr('id', 'priceChart')
-      .attr('stroke', 'steelblue')
-      .attr('stroke-width', '1.5')
-      .attr('d', line);
-
-    // calculates simple moving average over 50 days
-    const movingAverageData = this.movingAverage(data, 49);
-    svg
-      .append('path')
-      .data([movingAverageData])
-      .style('fill', 'none')
-      .attr('id', 'movingAverageLine')
-      .attr('stroke', '#FF8900')
-      .attr('stroke-width', '1.5')
-      .attr('d', movingAverageLine);
+      .append('g')
+      .attr('id', 'leftAxis')
+      .attr('transform', `translate(0, 0)`);
 
     // define x and y crosshair properties
     const focus = svg
@@ -244,7 +222,7 @@ class HistoricalPriceChart {
     d3.selectAll('.focus line').style('stroke-dasharray', '3 3');
 
     // get VIG dividend data for year of 2018
-    const dividendData = this.currentData['dividends'].filter(row => {
+    const dividendData = data['dividends'].filter(row => {
       if (row['date']) {
         return (
           row['date'] >= thisYearStartDate && row['date'] <= thisYearEndDate
@@ -253,14 +231,14 @@ class HistoricalPriceChart {
     });
 
     // generates the rest of the graph
-    this.updateChart(data, dividendData);
+    this.updateChart(dividendData);
   }
 
   setDataset(event) {
     this.loadData(event.target.value).then(response => {
       const thisYearStartDate = new Date(2018, 0, 1);
       const thisYearEndDate = new Date(2018, 11, 31);
-      const filteredData = response['quote']
+      this.currentData = response['quote']
         .filter(row => row['high'] && row['low'] && row['close'] && row['open'])
         .filter(row => {
           if (row['date']) {
@@ -270,29 +248,17 @@ class HistoricalPriceChart {
           }
         });
 
-      this.margin = { top: 50, right: 50, bottom: 50, left: 50 };
+      this.margin = { top: 50, right: 40, bottom: 50, left: 60 };
       this.width = window.innerWidth - this.margin.left - this.margin.right; // Use the window's width
       this.height = window.innerHeight - this.margin.top - this.margin.bottom; // Use the window's height
 
       /* update the min, max values, and scales for the axes */
-      const xMin = d3.min(filteredData, d => {
-        return Math.min(d['date']);
-      });
-
-      const xMax = d3.max(filteredData, d => {
-        return Math.max(d['date']);
-      });
-
-      const yMin = d3.min(filteredData, d => {
-        return Math.min(d['close']);
-      });
-
-      const yMax = d3.max(filteredData, d => {
-        return Math.max(d['close']);
-      });
+      const xMin = d3.min(this.currentData, d => Math.min(d['date']));
+      const xMax = d3.max(this.currentData, d => Math.max(d['date']));
+      const yMin = d3.min(this.currentData, d => Math.min(d['close']));
+      const yMax = d3.max(this.currentData, d => Math.max(d['close']));
 
       this.xScale.domain([xMin, xMax]);
-
       this.yScale.domain([yMin - 5, yMax]);
 
       // get dividend data for current dataset
@@ -304,54 +270,28 @@ class HistoricalPriceChart {
         }
       });
 
-      this.updateChart(filteredData, dividendData);
+      this.updateChart(dividendData);
     });
   }
 
-  updateChart(filteredData, dividendData) {
-    const line = d3
-      .line()
-      .x(d => this.xScale(d['date']))
-      .y(d => this.yScale(d['close']));
-
-    const movingAverageLine = d3
-      .line()
-      .x(d => this.xScale(d['date']))
-      .y(d => this.yScale(d['average']))
-      .curve(d3.curveBasis);
-
-    const svg = d3.select('#chart').transition();
-
-    /* Update the price chart */
-    svg
-      .select('#priceChart')
-      .duration(750)
-      .attr('d', line(filteredData));
-
-    /* Update the moving average line */
-    const movingAverageData = this.movingAverage(filteredData, 49);
-    svg
-      .select('#movingAverageLine')
-      .duration(750)
-      .attr('d', movingAverageLine(movingAverageData));
-
+  updateChart(dividendData) {
     /* Update the axis */
-
     d3.select('#xAxis').call(d3.axisBottom(this.xScale));
     d3.select('#yAxis').call(d3.axisRight(this.yScale));
 
     /* Update the volume series */
     const chart = d3.select('#chart').select('g');
-    const yMinVolume = d3.min(filteredData, d => Math.min(d['volume']));
-    const yMaxVolume = d3.max(filteredData, d => Math.max(d['volume']));
+    const yMinVolume = d3.min(this.currentData, d => Math.min(d['volume']));
+    const yMaxVolume = d3.max(this.currentData, d => Math.max(d['volume']));
 
     const yVolumeScale = d3
       .scaleLinear()
       .domain([yMinVolume, yMaxVolume])
       .range([this.height, this.height * (3 / 4)]);
+    d3.select('#leftAxis').call(d3.axisLeft(yVolumeScale));
 
     //select, followed by updating data join
-    const bars = chart.selectAll('.vol').data(filteredData, d => d['date']);
+    const bars = chart.selectAll('.vol').data(this.currentData, d => d['date']);
 
     bars.exit().remove();
 
@@ -370,7 +310,9 @@ class HistoricalPriceChart {
           return '#03a678';
         } else {
           // green bar if price is rising during that period, and red when price is falling
-          return filteredData[i - 1].close > d.close ? '#c0392b' : '#03a678';
+          return this.currentData[i - 1].close > d.close
+            ? '#c0392b'
+            : '#03a678';
         }
       })
       .attr('width', 1)
@@ -408,9 +350,9 @@ class HistoricalPriceChart {
       //returns corresponding value from the domain
       const correspondingDate = that.xScale.invert(d3.mouse(this)[0]);
       //gets insertion point
-      const i = bisectDate(filteredData, correspondingDate, 1);
-      const d0 = filteredData[i - 1];
-      const d1 = filteredData[i];
+      const i = bisectDate(that.currentData, correspondingDate, 1);
+      const d0 = that.currentData[i - 1];
+      const d1 = that.currentData[i];
       const currentPoint =
         correspondingDate - d0['date'] > d1['date'] - correspondingDate
           ? d1
@@ -513,7 +455,28 @@ class HistoricalPriceChart {
         'transform',
         (d, i) => `translate(${this.xScale(d['date'])},${this.height - 80})`
       );
+
+    /* Update the price chart */
+    const closeCheckboxToggle = document.querySelector('input[id=close]')
+      .checked;
+    this.toggleClose(closeCheckboxToggle);
+
+    /* Update the moving average line */
+    const movingAverageCheckboxToggle = document.querySelector(
+      'input[id=moving-average]'
+    ).checked;
+    this.toggleMovingAverage(movingAverageCheckboxToggle);
+
+    /* display OHLC chart */
+    const checkboxToggle = document.querySelector('input[id=ohlc]').checked;
+    this.toggleOHLC(checkboxToggle);
+
+    /* display Candlesticks chart */
+    const candlesticksToggle = document.querySelector('input[id=candlesticks]')
+      .checked;
+    this.toggleCandlesticks(candlesticksToggle);
   }
+
   updateLegends(currentPoint) {
     d3.selectAll('.line-legend').remove();
 
@@ -526,9 +489,7 @@ class HistoricalPriceChart {
       .enter()
       .append('g')
       .attr('class', 'line-legend')
-      .attr('transform', (d, i) => {
-        return `translate(0, ${i * 20})`;
-      });
+      .attr('transform', (d, i) => `translate(0, ${i * 20})`);
     lineLegend
       .append('text')
       .text(d => {
@@ -548,5 +509,208 @@ class HistoricalPriceChart {
       .style('font-size', '0.8em')
       .style('fill', 'white')
       .attr('transform', 'translate(15,9)'); //align texts with boxes
+  }
+
+  toggleClose(value) {
+    if (value) {
+      const line = d3
+        .line()
+        .x(d => this.xScale(d['date']))
+        .y(d => this.yScale(d['close']));
+      const lineSelect = d3
+        .select('#chart')
+        .select('svg')
+        .select('g')
+        .selectAll('.priceChart')
+        .data([this.currentData]);
+
+      lineSelect
+        .enter()
+        .append('path')
+        .style('fill', 'none')
+        .attr('class', 'priceChart')
+        .attr('stroke', 'steelblue')
+        .attr('stroke-width', '1.5')
+        .attr('d', line);
+
+      // Update the price chart
+      lineSelect
+        .transition()
+        .duration(750)
+        .attr('d', line);
+    } else {
+      // Remove close price chart
+      d3.select('.priceChart').remove();
+    }
+  }
+
+  toggleMovingAverage(value) {
+    if (value) {
+      // calculates simple moving average over 50 days
+      const movingAverageData = this.movingAverage(this.currentData, 49);
+
+      const movingAverageLine = d3
+        .line()
+        .x(d => this.xScale(d['date']))
+        .y(d => this.yScale(d['average']))
+        .curve(d3.curveBasis);
+      const movingAverageSelect = d3
+        .select('#chart')
+        .select('svg')
+        .select('g')
+        .selectAll('.movingAverageLine')
+        .data([movingAverageData]);
+
+      movingAverageSelect
+        .enter()
+        .append('path')
+        .style('fill', 'none')
+        .attr('class', 'movingAverageLine')
+        .attr('stroke', '#FF8900')
+        .attr('stroke-width', '1.5')
+        .attr('d', movingAverageLine);
+
+      // Update the moving average line
+      movingAverageSelect
+        .transition()
+        .duration(750)
+        .attr('d', movingAverageLine);
+    } else {
+      // Remove moving average line
+      d3.select('.movingAverageLine').remove();
+    }
+  }
+
+  toggleOHLC(value) {
+    if (value) {
+      const tickWidth = 5;
+      const ohlcLine = d3
+        .line()
+        .x(d => d['x'])
+        .y(d => d['y']);
+
+      const ohlcSelection = d3
+        .select('#chart')
+        .select('g')
+        .selectAll('.ohlc')
+        .data(this.currentData, d => d['volume']);
+
+      ohlcSelection.exit().remove();
+
+      const ohlcEnter = ohlcSelection
+        .enter()
+        .append('g')
+        .attr('class', 'ohlc')
+        .append('g')
+        .attr('class', 'bars')
+        .classed('up-day', d => d['close'] > d['open'])
+        .classed('down-day', d => d['close'] <= d['open']);
+
+      // intraday range represented by vertical line
+      ohlcEnter
+        .append('path')
+        .classed('high-low', true)
+        .attr('d', d => {
+          return ohlcLine([
+            { x: this.xScale(d['date']), y: this.yScale(d['high']) },
+            { x: this.xScale(d['date']), y: this.yScale(d['low']) }
+          ]);
+        });
+
+      // open price represented by left horizontal line
+      ohlcEnter
+        .append('path')
+        .classed('open-tick', true)
+        .attr('d', d => {
+          return ohlcLine([
+            {
+              x: this.xScale(d['date']) - tickWidth,
+              y: this.yScale(d['open'])
+            },
+            { x: this.xScale(d['date']), y: this.yScale(d['open']) }
+          ]);
+        });
+
+      // close price represented by right horizontal line
+      ohlcEnter
+        .append('path')
+        .classed('close-tick', true)
+        .attr('d', d => {
+          return ohlcLine([
+            { x: this.xScale(d['date']), y: this.yScale(d['close']) },
+            {
+              x: this.xScale(d['date']) + tickWidth,
+              y: this.yScale(d['close'])
+            }
+          ]);
+        });
+    } else {
+      // remove OHLC
+      d3.select('#chart')
+        .select('g')
+        .selectAll('.ohlc')
+        .remove();
+    }
+  }
+
+  toggleCandlesticks(value) {
+    if (value) {
+      const bodyWidth = 5;
+      const candlesticksLine = d3
+        .line()
+        .x(function(d) {
+          return d.x;
+        })
+        .y(function(d) {
+          return d.y;
+        });
+      const candlesticksSelection = d3
+        .select('#chart')
+        .select('g')
+        .selectAll('.candlesticks')
+        .data(this.currentData, d => d['volume']);
+
+      candlesticksSelection.exit().remove();
+
+      const candlesticksEnter = candlesticksSelection
+        .enter()
+        .append('g')
+        .attr('class', 'candlesticks')
+        .append('g')
+        .attr('class', 'bars')
+        .classed('up-day', d => d['close'] > d['open'])
+        .classed('down-day', d => d['close'] <= d['open']);
+
+      candlesticksEnter
+        .append('path')
+        .classed('high-low', true)
+        .attr('d', d => {
+          return candlesticksLine([
+            { x: this.xScale(d['date']), y: this.yScale(d['high']) },
+            { x: this.xScale(d['date']), y: this.yScale(d['low']) }
+          ]);
+        });
+
+      candlesticksEnter
+        .append('rect')
+        .attr('x', d => this.xScale(d.date) - bodyWidth / 2)
+        .attr('y', d => {
+          return d['close'] > d['open']
+            ? this.yScale(d.close)
+            : this.yScale(d.open);
+        })
+        .attr('width', bodyWidth)
+        .attr('height', d => {
+          return d['close'] > d['open']
+            ? this.yScale(d.open) - this.yScale(d.close)
+            : this.yScale(d.close) - this.yScale(d.open);
+        });
+    } else {
+      // remove candlesticks
+      d3.select('#chart')
+        .select('g')
+        .selectAll('.candlesticks')
+        .remove();
+    }
   }
 }

@@ -1,6 +1,6 @@
 body {
   background: #00151c;
-  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
 #chart {
@@ -29,7 +29,7 @@ body {
   width: 100%;
   line-height: 0;
   color: lightsteelblue;
-  content: '\25BC';
+  content: "\25BC";
   position: absolute;
   text-align: center;
   top: 100%;
@@ -63,6 +63,22 @@ body {
 
 a {
   color: #67809f;
+}
+
+.bars.up-day path {
+  stroke: green;
+}
+
+.bars.down-day path {
+  stroke: red;
+}
+
+.bars.up-day rect {
+  fill: green;
+}
+
+.bars.down-day rect {
+  fill: red;
 }
 
 @media screen and (max-width: 768px) {

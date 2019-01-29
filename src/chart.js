@@ -592,7 +592,7 @@ class HistoricalPriceChart {
       const ohlcSelection = d3
         .select('#chart')
         .select('g')
-        .selectAll('.ohlc-series')
+        .selectAll('.ohlc')
         .data(this.currentData, d => d['volume']);
 
       ohlcSelection.exit().remove();
@@ -600,7 +600,7 @@ class HistoricalPriceChart {
       const ohlcEnter = ohlcSelection
         .enter()
         .append('g')
-        .attr('class', 'ohlc-series')
+        .attr('class', 'ohlc')
         .append('g')
         .attr('class', 'bars')
         .classed('up-day', d => d['close'] > d['open'])
@@ -609,7 +609,7 @@ class HistoricalPriceChart {
       // intraday range represented by vertical line
       ohlcEnter
         .append('path')
-        .classed('high-low-line', true)
+        .classed('high-low', true)
         .attr('d', d => {
           return ohlcLine([
             { x: this.xScale(d['date']), y: this.yScale(d['high']) },
@@ -648,7 +648,7 @@ class HistoricalPriceChart {
       // remove OHLC
       d3.select('#chart')
         .select('g')
-        .selectAll('.ohlc-series')
+        .selectAll('.ohlc')
         .remove();
     }
   }
@@ -667,7 +667,7 @@ class HistoricalPriceChart {
       const candlesticksSelection = d3
         .select('#chart')
         .select('g')
-        .selectAll('.candlesticks-series')
+        .selectAll('.candlesticks')
         .data(this.currentData, d => d['volume']);
 
       candlesticksSelection.exit().remove();
@@ -675,7 +675,7 @@ class HistoricalPriceChart {
       const candlesticksEnter = candlesticksSelection
         .enter()
         .append('g')
-        .attr('class', 'candlesticks-series')
+        .attr('class', 'candlesticks')
         .append('g')
         .attr('class', 'bars')
         .classed('up-day', d => d['close'] > d['open'])
@@ -683,7 +683,7 @@ class HistoricalPriceChart {
 
       candlesticksEnter
         .append('path')
-        .classed('high-low-line', true)
+        .classed('high-low', true)
         .attr('d', d => {
           return candlesticksLine([
             { x: this.xScale(d['date']), y: this.yScale(d['high']) },
@@ -709,7 +709,7 @@ class HistoricalPriceChart {
       // remove candlesticks
       d3.select('#chart')
         .select('g')
-        .selectAll('.candlesticks-series')
+        .selectAll('.candlesticks')
         .remove();
     }
   }

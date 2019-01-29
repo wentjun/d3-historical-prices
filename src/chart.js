@@ -34,6 +34,13 @@ class HistoricalPriceChart {
     viewOHLC.addEventListener('change', event => {
       this.toggleOHLC(document.querySelector('input[id=ohlc]').checked);
     });
+
+    const viewCandlesticks = document.querySelector('input[id=candlesticks]');
+    viewCandlesticks.addEventListener('change', event => {
+      this.toggleCandlesticks(
+        document.querySelector('input[id=candlesticks]').checked
+      );
+    });
   }
 
   loadData(selectedDataset = 'vig') {
@@ -101,7 +108,12 @@ class HistoricalPriceChart {
       var targetWidth = parseInt(container.style('width'));
       var targetHeight = parseInt(container.style('height'));
       var targetAspect = targetWidth / targetHeight;
-
+      /*
+      if (this) {
+        this.width = targetWidth;
+        this.height = Math.round(targetWidth / targetAspect);
+      }
+      */
       svg.attr('width', targetWidth);
       svg.attr('height', Math.round(targetWidth / targetAspect));
     };
@@ -134,7 +146,7 @@ class HistoricalPriceChart {
         }
       });
 
-    this.margin = { top: 50, right: 50, bottom: 50, left: 50 };
+    this.margin = { top: 50, right: 40, bottom: 50, left: 60 };
     this.width = window.innerWidth - this.margin.left - this.margin.right; // Use the window's width
     this.height = window.innerHeight - this.margin.top - this.margin.bottom; // Use the window's height
 
@@ -161,7 +173,7 @@ class HistoricalPriceChart {
       .append('svg')
       .attr('width', this.width + this.margin['left'] + this.margin['right'])
       .attr('height', this.height + this.margin['top'] + this.margin['bottom'])
-      .call(this.responsivefy)
+      //.call(this.responsivefy)
       .append('g')
       .attr(
         'transform',
@@ -180,6 +192,10 @@ class HistoricalPriceChart {
       .attr('id', 'yAxis')
       .attr('transform', `translate(${this.width}, 0)`)
       .call(d3.axisRight(this.yScale));
+    svg
+      .append('g')
+      .attr('id', 'leftAxis')
+      .attr('transform', `translate(0, 0)`);
 
     // define x and y crosshair properties
     const focus = svg
@@ -232,7 +248,7 @@ class HistoricalPriceChart {
           }
         });
 
-      this.margin = { top: 50, right: 50, bottom: 50, left: 50 };
+      this.margin = { top: 50, right: 40, bottom: 50, left: 60 };
       this.width = window.innerWidth - this.margin.left - this.margin.right; // Use the window's width
       this.height = window.innerHeight - this.margin.top - this.margin.bottom; // Use the window's height
 
@@ -259,17 +275,6 @@ class HistoricalPriceChart {
   }
 
   updateChart(dividendData) {
-    /* Update the price chart */
-    const closeCheckboxToggle = document.querySelector('input[id=close]')
-      .checked;
-    this.toggleClose(closeCheckboxToggle);
-
-    /* Update the moving average line */
-    const movingAverageCheckboxToggle = document.querySelector(
-      'input[id=moving-average]'
-    ).checked;
-    this.toggleMovingAverage(movingAverageCheckboxToggle);
-
     /* Update the axis */
     d3.select('#xAxis').call(d3.axisBottom(this.xScale));
     d3.select('#yAxis').call(d3.axisRight(this.yScale));
@@ -283,6 +288,7 @@ class HistoricalPriceChart {
       .scaleLinear()
       .domain([yMinVolume, yMaxVolume])
       .range([this.height, this.height * (3 / 4)]);
+    d3.select('#leftAxis').call(d3.axisLeft(yVolumeScale));
 
     //select, followed by updating data join
     const bars = chart.selectAll('.vol').data(this.currentData, d => d['date']);
@@ -450,11 +456,25 @@ class HistoricalPriceChart {
         (d, i) => `translate(${this.xScale(d['date'])},${this.height - 80})`
       );
 
+    /* Update the price chart */
+    const closeCheckboxToggle = document.querySelector('input[id=close]')
+      .checked;
+    this.toggleClose(closeCheckboxToggle);
+
+    /* Update the moving average line */
+    const movingAverageCheckboxToggle = document.querySelector(
+      'input[id=moving-average]'
+    ).checked;
+    this.toggleMovingAverage(movingAverageCheckboxToggle);
+
     /* display OHLC chart */
     const checkboxToggle = document.querySelector('input[id=ohlc]').checked;
     this.toggleOHLC(checkboxToggle);
 
-    this.toggleCandlesticks(true);
+    /* display Candlesticks chart */
+    const candlesticksToggle = document.querySelector('input[id=candlesticks]')
+      .checked;
+    this.toggleCandlesticks(candlesticksToggle);
   }
 
   updateLegends(currentPoint) {
@@ -635,7 +655,6 @@ class HistoricalPriceChart {
 
   toggleCandlesticks(value) {
     if (value) {
-      console.log(value);
       const bodyWidth = 5;
       const candlesticksLine = d3
         .line()
@@ -651,7 +670,7 @@ class HistoricalPriceChart {
         .selectAll('.candlesticks-series')
         .data(this.currentData, d => d['volume']);
 
-      //candlesticksSelection.exit().remove();
+      candlesticksSelection.exit().remove();
 
       const candlesticksEnter = candlesticksSelection
         .enter()
@@ -687,6 +706,11 @@ class HistoricalPriceChart {
             : this.yScale(d.close) - this.yScale(d.open);
         });
     } else {
+      // remove candlesticks
+      d3.select('#chart')
+        .select('g')
+        .selectAll('.candlesticks-series')
+        .remove();
     }
   }
 }

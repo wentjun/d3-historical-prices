@@ -181,15 +181,15 @@ class HistoricalPriceChart {
       );
 
     // create the axes component
-    svg
+    this.xAxis = svg
       .append('g')
-      .attr('id', 'xAxis')
+      .attr('class', 'xAxis')
       .attr('transform', `translate(0, ${this.height})`)
       .call(d3.axisBottom(this.xScale));
 
-    svg
+    this.yAxis = svg
       .append('g')
-      .attr('id', 'yAxis')
+      .attr('class', 'yAxis')
       .attr('transform', `translate(${this.width}, 0)`)
       .call(d3.axisRight(this.yScale));
     svg
@@ -276,8 +276,8 @@ class HistoricalPriceChart {
 
   updateChart(dividendData) {
     /* Update the axis */
-    d3.select('#xAxis').call(d3.axisBottom(this.xScale));
-    d3.select('#yAxis').call(d3.axisRight(this.yScale));
+    d3.select('.xAxis').call(d3.axisBottom(this.xScale));
+    d3.select('.yAxis').call(d3.axisRight(this.yScale));
 
     /* Update the volume series */
     const chart = d3.select('#chart').select('g');
@@ -467,14 +467,33 @@ class HistoricalPriceChart {
     ).checked;
     this.toggleMovingAverage(movingAverageCheckboxToggle);
 
-    /* display OHLC chart */
+    /* Display OHLC chart */
     const checkboxToggle = document.querySelector('input[id=ohlc]').checked;
     this.toggleOHLC(checkboxToggle);
 
-    /* display Candlesticks chart */
+    /* Display Candlesticks chart */
     const candlesticksToggle = document.querySelector('input[id=candlesticks]')
       .checked;
     this.toggleCandlesticks(candlesticksToggle);
+
+    /* Handle zoom and pan */
+    const xAxis = d3.axisBottom(this.xScale);
+    const yAxis = d3.axisRight(this.yScale);
+
+    const zoomed = () => {
+      var updatedXScale = d3.event.transform.rescaleX(this.xScale);
+      var updatedYScale = d3.event.transform.rescaleY(this.yScale);
+      this.xAxis.call(xAxis.scale(updatedXScale));
+      this.yAxis.call(yAxis.scale(updatedYScale));
+    };
+
+    const zoom = d3
+      .zoom()
+      .scaleExtent([1, 10])
+      .translateExtent([[0, 0], [this.width, this.height]])
+      .on('zoom', zoomed);
+
+    d3.select('svg').call(zoom);
   }
 
   updateLegends(currentPoint) {

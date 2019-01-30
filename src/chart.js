@@ -230,6 +230,13 @@ class HistoricalPriceChart {
       }
     });
 
+    svg
+      .append('clipPath')
+      .attr('id', 'clip')
+      .append('rect')
+      .attr('width', this.width)
+      .attr('height', this.height);
+
     // generates the rest of the graph
     this.updateChart(dividendData);
   }
@@ -284,6 +291,11 @@ class HistoricalPriceChart {
     const yMinVolume = d3.min(this.currentData, d => Math.min(d['volume']));
     const yMaxVolume = d3.max(this.currentData, d => Math.max(d['volume']));
 
+    chart
+      .append('g')
+      .attr('id', 'volume-series')
+      .attr('clip-path', 'url(#clip)');
+
     const yVolumeScale = d3
       .scaleLinear()
       .domain([yMinVolume, yMaxVolume])
@@ -291,7 +303,10 @@ class HistoricalPriceChart {
     d3.select('#leftAxis').call(d3.axisLeft(yVolumeScale));
 
     //select, followed by updating data join
-    const bars = chart.selectAll('.vol').data(this.currentData, d => d['date']);
+    const bars = d3
+      .select('#volume-series')
+      .selectAll('.vol')
+      .data(this.currentData, d => d['date']);
 
     bars.exit().remove();
 
@@ -383,10 +398,16 @@ class HistoricalPriceChart {
     }
 
     /* Updating of dividends */
+    // group dividend symbols, and with clip-path attribute
+    d3.select('#chart')
+      .select('g')
+      .append('g')
+      .attr('id', 'dividends')
+      .attr('clip-path', 'url(#clip)');
+
     // select all dividend groups, and bind the new data
     const dividendSelect = d3
-      .select('#chart')
-      .select('g')
+      .select('#dividends')
       .selectAll('.dividend-group')
       .data(dividendData);
 
@@ -481,16 +502,25 @@ class HistoricalPriceChart {
     const yAxis = d3.axisRight(this.yScale);
 
     const zoomed = () => {
+      // create new scale ojects based on zoom/pan event
       var updatedXScale = d3.event.transform.rescaleX(this.xScale);
       var updatedYScale = d3.event.transform.rescaleY(this.yScale);
+      // update axes
       this.xAxis.call(xAxis.scale(updatedXScale));
       this.yAxis.call(yAxis.scale(updatedYScale));
+      bars.attr('x', d => updatedXScale(d['date']));
+      //console.log(bars);
+      dividendsEnter.attr(
+        'transform',
+        (d, i) => `translate(${updatedXScale(d['date'])},${this.height - 80})`
+      );
     };
 
     const zoom = d3
       .zoom()
       .scaleExtent([1, 10])
-      .translateExtent([[0, 0], [this.width, this.height]])
+      .translateExtent([[0, 0], [this.width, this.height]]) // pan limit
+      .extent([[0, 0], [this.width, this.height]]) // zoom limit
       .on('zoom', zoomed);
 
     d3.select('svg').call(zoom);

@@ -5,6 +5,7 @@ class HistoricalPriceChart {
     this.height;
     this.xScale;
     this.yscale;
+    this.zoom;
     this.currentData = {};
 
     this.loadData('vig').then(data => {
@@ -146,7 +147,7 @@ class HistoricalPriceChart {
         }
       });
 
-    this.margin = { top: 50, right: 40, bottom: 50, left: 60 };
+    this.margin = { top: 50, right: 50, bottom: 50, left: 20 };
     this.width = window.innerWidth - this.margin.left - this.margin.right; // Use the window's width
     this.height = window.innerHeight - this.margin.top - this.margin.bottom; // Use the window's height
 
@@ -600,14 +601,14 @@ class HistoricalPriceChart {
         });
     };
 
-    const zoom = d3
+    this.zoom = d3
       .zoom()
       .scaleExtent([1, 10])
       .translateExtent([[0, 0], [this.width, this.height]]) // pan limit
       .extent([[0, 0], [this.width, this.height]]) // zoom limit
       .on('zoom', zoomed);
 
-    d3.select('svg').call(zoom);
+    d3.select('svg').call(this.zoom);
   }
 
   /* Mouseover function to generate crosshair */
@@ -683,6 +684,13 @@ class HistoricalPriceChart {
 
   toggleClose(value) {
     if (value) {
+      if (this.zoom) {
+        d3.select('svg')
+          .transition()
+          .duration(750)
+          .call(this.zoom.transform, d3.zoomIdentity.scale(1));
+      }
+
       const line = d3
         .line()
         .x(d => this.xScale(d['date']))
@@ -717,6 +725,12 @@ class HistoricalPriceChart {
 
   toggleMovingAverage(value) {
     if (value) {
+      if (this.zoom) {
+        d3.select('svg')
+          .transition()
+          .duration(750)
+          .call(this.zoom.transform, d3.zoomIdentity.scale(1));
+      }
       // calculates simple moving average over 50 days
       const movingAverageData = this.movingAverage(this.currentData, 49);
 
@@ -755,6 +769,11 @@ class HistoricalPriceChart {
 
   toggleOHLC(value) {
     if (value) {
+      d3.select('svg')
+        .transition()
+        .duration(750)
+        .call(this.zoom.transform, d3.zoomIdentity.scale(1));
+
       const tickWidth = 5;
       const ohlcLine = d3
         .line()
@@ -828,6 +847,11 @@ class HistoricalPriceChart {
 
   toggleCandlesticks(value) {
     if (value) {
+      d3.select('svg')
+        .transition()
+        .duration(750)
+        .call(this.zoom.transform, d3.zoomIdentity.scale(1));
+
       const bodyWidth = 5;
       const candlesticksLine = d3
         .line()

@@ -66,19 +66,19 @@ a {
 }
 
 .bars.up-day path {
-  stroke: green;
+  stroke: #03a678;
 }
 
 .bars.down-day path {
-  stroke: red;
+  stroke: #c0392b;
 }
 
 .bars.up-day rect {
-  fill: green;
+  fill: #03a678;
 }
 
 .bars.down-day rect {
-  fill: red;
+  fill: #c0392b;
 }
 
 @media screen and (max-width: 768px) {

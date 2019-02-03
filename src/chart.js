@@ -5,6 +5,7 @@ class HistoricalPriceChart {
     this.height;
     this.xScale;
     this.yscale;
+    this.zoom;
     this.currentData = {};
 
     this.loadData('vig').then(data => {
@@ -146,7 +147,7 @@ class HistoricalPriceChart {
         }
       });
 
-    this.margin = { top: 50, right: 40, bottom: 50, left: 60 };
+    this.margin = { top: 50, right: 50, bottom: 50, left: 20 };
     this.width = window.innerWidth - this.margin.left - this.margin.right; // Use the window's width
     this.height = window.innerHeight - this.margin.top - this.margin.bottom; // Use the window's height
 
@@ -181,15 +182,15 @@ class HistoricalPriceChart {
       );
 
     // create the axes component
-    svg
+    this.xAxis = svg
       .append('g')
-      .attr('id', 'xAxis')
+      .attr('class', 'xAxis')
       .attr('transform', `translate(0, ${this.height})`)
       .call(d3.axisBottom(this.xScale));
 
-    svg
+    this.yAxis = svg
       .append('g')
-      .attr('id', 'yAxis')
+      .attr('class', 'yAxis')
       .attr('transform', `translate(${this.width}, 0)`)
       .call(d3.axisRight(this.yScale));
     svg
@@ -229,6 +230,13 @@ class HistoricalPriceChart {
         );
       }
     });
+
+    svg
+      .append('clipPath')
+      .attr('id', 'clip')
+      .append('rect')
+      .attr('width', this.width)
+      .attr('height', this.height);
 
     // generates the rest of the graph
     this.updateChart(dividendData);
@@ -276,22 +284,30 @@ class HistoricalPriceChart {
 
   updateChart(dividendData) {
     /* Update the axis */
-    d3.select('#xAxis').call(d3.axisBottom(this.xScale));
-    d3.select('#yAxis').call(d3.axisRight(this.yScale));
+    d3.select('.xAxis').call(d3.axisBottom(this.xScale));
+    d3.select('.yAxis').call(d3.axisRight(this.yScale));
 
     /* Update the volume series */
     const chart = d3.select('#chart').select('g');
     const yMinVolume = d3.min(this.currentData, d => Math.min(d['volume']));
     const yMaxVolume = d3.max(this.currentData, d => Math.max(d['volume']));
 
+    chart
+      .append('g')
+      .attr('id', 'volume-series')
+      .attr('clip-path', 'url(#clip)');
+
     const yVolumeScale = d3
       .scaleLinear()
       .domain([yMinVolume, yMaxVolume])
       .range([this.height, this.height * (3 / 4)]);
-    d3.select('#leftAxis').call(d3.axisLeft(yVolumeScale));
+    //d3.select('#leftAxis').call(d3.axisLeft(yVolumeScale));
 
     //select, followed by updating data join
-    const bars = chart.selectAll('.vol').data(this.currentData, d => d['date']);
+    const bars = d3
+      .select('#volume-series')
+      .selectAll('.vol')
+      .data(this.currentData, d => d['date']);
 
     bars.exit().remove();
 
@@ -321,6 +337,7 @@ class HistoricalPriceChart {
     /* updating of crosshair */
     // select the existing crosshair, and bind new data
     const overlay = d3.select('.overlay');
+    const focus = d3.select('.focus');
 
     // remove old crosshair
     overlay.exit().remove();
@@ -338,55 +355,19 @@ class HistoricalPriceChart {
       .attr('height', this.height)
       .on('mouseover', () => focus.style('display', null))
       .on('mouseout', () => focus.style('display', 'none'))
-      .on('mousemove', generateCrosshair);
-
-    const focus = d3.select('.focus');
-    const bisectDate = d3.bisector(d => d.date).left;
-
-    const that = this;
-
-    /* Mouseover function to generate crosshair */
-    function generateCrosshair() {
-      //returns corresponding value from the domain
-      const correspondingDate = that.xScale.invert(d3.mouse(this)[0]);
-      //gets insertion point
-      const i = bisectDate(that.currentData, correspondingDate, 1);
-      const d0 = that.currentData[i - 1];
-      const d1 = that.currentData[i];
-      const currentPoint =
-        correspondingDate - d0['date'] > d1['date'] - correspondingDate
-          ? d1
-          : d0;
-      focus.attr(
-        'transform',
-        `translate(${that.xScale(currentPoint['date'])}, ${that.yScale(
-          currentPoint['close']
-        )})`
-      );
-
-      focus
-        .select('line.x')
-        .attr('x1', 0)
-        .attr('x2', that.width - that.xScale(currentPoint['date']))
-        .attr('y1', 0)
-        .attr('y2', 0);
-
-      focus
-        .select('line.y')
-        .attr('x1', 0)
-        .attr('x2', 0)
-        .attr('y1', 0)
-        .attr('y2', that.height - that.yScale(currentPoint['close']));
-
-      // updates the legend to display the date, open, close, high, low, and volume and selected mouseover area
-      that.updateLegends(currentPoint);
-    }
+      .on('mousemove', (d, i, nodes) => this.generateCrosshair(nodes[i]));
 
     /* Updating of dividends */
+    // group dividend symbols, and with clip-path attribute
+    d3.select('#chart')
+      .select('g')
+      .append('g')
+      .attr('id', 'dividends')
+      .attr('clip-path', 'url(#clip)');
+
     // select all dividend groups, and bind the new data
     const dividendSelect = d3
-      .select('#chart')
-      .select('g')
+      .select('#dividends')
       .selectAll('.dividend-group')
       .data(dividendData);
 
@@ -467,14 +448,204 @@ class HistoricalPriceChart {
     ).checked;
     this.toggleMovingAverage(movingAverageCheckboxToggle);
 
-    /* display OHLC chart */
+    /* Display OHLC chart */
     const checkboxToggle = document.querySelector('input[id=ohlc]').checked;
     this.toggleOHLC(checkboxToggle);
 
-    /* display Candlesticks chart */
+    /* Display Candlesticks chart */
     const candlesticksToggle = document.querySelector('input[id=candlesticks]')
       .checked;
     this.toggleCandlesticks(candlesticksToggle);
+
+    /* Handle zoom and pan */
+    const xAxis = d3.axisBottom(this.xScale);
+    const yAxis = d3.axisRight(this.yScale);
+    const ohlcLine = d3
+      .line()
+      .x(d => d['x'])
+      .y(d => d['y']);
+    const candlesticksLine = d3
+      .line()
+      .x(d => d['x'])
+      .y(d => d['y']);
+    const tickWidth = 5;
+    const bodyWidth = 5;
+
+    const zoomed = () => {
+      // create new scale ojects based on zoom/pan event
+      var updatedXScale = d3.event.transform.rescaleX(this.xScale);
+      var updatedYScale = d3.event.transform.rescaleY(this.yScale);
+      // update axes
+      this.xAxis.call(xAxis.scale(updatedXScale));
+      this.yAxis.call(yAxis.scale(updatedYScale));
+
+      // update close price and moving average lines based on zoom/pan
+      const updateClosePriceChartPlot = d3
+        .line()
+        .x(d => updatedXScale(d['date']))
+        .y(d => updatedYScale(d['close']));
+      const updateMovingAverageLinePlot = d3
+        .line()
+        .x(d => updatedXScale(d['date']))
+        .y(d => updatedYScale(d['average']))
+        .curve(d3.curveBasis);
+      d3.select('.moving-average-line').attr('d', updateMovingAverageLinePlot);
+      d3.select('.price-chart').attr('d', updateClosePriceChartPlot);
+
+      // update dividends based on zoom/pan
+      d3.selectAll('.dividend-group').attr(
+        'transform',
+        (d, i) => `translate(${updatedXScale(d['date'])},${this.height - 80})`
+      );
+      // update volume series based on zoom/pan
+      d3.selectAll('.vol').attr('x', d => updatedXScale(d['date']));
+
+      // update ohlc series based on zoom/pan
+      d3.selectAll('.ohlc .high-low').attr('d', d => {
+        return ohlcLine([
+          { x: updatedXScale(d['date']), y: updatedYScale(d['high']) },
+          { x: updatedXScale(d['date']), y: updatedYScale(d['low']) }
+        ]);
+      });
+      d3.selectAll('.open-tick').attr('d', d => {
+        return ohlcLine([
+          {
+            x: updatedXScale(d['date']) - tickWidth,
+            y: updatedYScale(d['open'])
+          },
+          { x: updatedXScale(d['date']), y: updatedYScale(d['open']) }
+        ]);
+      });
+      d3.selectAll('.close-tick').attr('d', d => {
+        return ohlcLine([
+          { x: updatedXScale(d['date']), y: updatedYScale(d['close']) },
+          {
+            x: updatedXScale(d['date']) + tickWidth,
+            y: updatedYScale(d['close'])
+          }
+        ]);
+      });
+
+      // update candlesticks series based on zoom/pan
+      d3.selectAll('.candlesticks .high-low').attr('d', d => {
+        return candlesticksLine([
+          { x: updatedXScale(d['date']), y: updatedYScale(d['high']) },
+          { x: updatedXScale(d['date']), y: updatedYScale(d['low']) }
+        ]);
+      });
+      d3.selectAll('.candlesticks rect')
+        .attr('x', d => updatedXScale(d['date']) - bodyWidth / 2)
+        .attr('y', d => {
+          return d['close'] > d['open']
+            ? updatedYScale(d['close'])
+            : updatedYScale(d['open']);
+        })
+        .attr('height', d => {
+          return d['close'] > d['open']
+            ? updatedYScale(d['open']) - updatedYScale(d['close'])
+            : updatedYScale(d['close']) - updatedYScale(d['open']);
+        });
+
+      const overlay = d3.select('.overlay');
+      const focus = d3.select('.focus');
+      const bisectDate = d3.bisector(d => d.date).left;
+
+      // remove old crosshair
+      overlay.exit().remove();
+
+      // enter, and update the attributes
+      overlay
+        .enter()
+        .append('g')
+        .attr('class', 'focus')
+        .style('display', 'none');
+
+      overlay
+        .attr('class', 'overlay')
+        .attr('width', this.width)
+        .attr('height', this.height)
+        .on('mouseover', () => focus.style('display', null))
+        .on('mouseout', () => focus.style('display', 'none'))
+        .on('mousemove', (d, i, nodes) => {
+          const correspondingDate = updatedXScale.invert(d3.mouse(nodes[i])[0]);
+          //gets insertion point
+          const i1 = bisectDate(this.currentData, correspondingDate, 1);
+          const d0 = this.currentData[i1 - 1];
+          const d1 = this.currentData[i1];
+          const currentPoint =
+            correspondingDate - d0['date'] > d1['date'] - correspondingDate
+              ? d1
+              : d0;
+          focus.attr(
+            'transform',
+            `translate(${updatedXScale(currentPoint['date'])}, ${updatedYScale(
+              currentPoint['close']
+            )})`
+          );
+
+          focus
+            .select('line.x')
+            .attr('x1', 0)
+            .attr('x2', this.width - updatedXScale(currentPoint['date']))
+            .attr('y1', 0)
+            .attr('y2', 0);
+
+          focus
+            .select('line.y')
+            .attr('x1', 0)
+            .attr('x2', 0)
+            .attr('y1', 0)
+            .attr('y2', this.height - updatedYScale(currentPoint['close']));
+
+          this.updateLegends(currentPoint);
+        });
+    };
+
+    this.zoom = d3
+      .zoom()
+      .scaleExtent([1, 10])
+      .translateExtent([[0, 0], [this.width, this.height]]) // pan limit
+      .extent([[0, 0], [this.width, this.height]]) // zoom limit
+      .on('zoom', zoomed);
+
+    d3.select('svg').call(this.zoom);
+  }
+
+  /* Mouseover function to generate crosshair */
+  generateCrosshair(current) {
+    //returns corresponding value from the domain
+    const focus = d3.select('.focus');
+    const bisectDate = d3.bisector(d => d.date).left;
+    const correspondingDate = this.xScale.invert(d3.mouse(current)[0]);
+    //gets insertion point
+    const i = bisectDate(this.currentData, correspondingDate, 1);
+    const d0 = this.currentData[i - 1];
+    const d1 = this.currentData[i];
+    const currentPoint =
+      correspondingDate - d0['date'] > d1['date'] - correspondingDate ? d1 : d0;
+    focus.attr(
+      'transform',
+      `translate(${this.xScale(currentPoint['date'])}, ${this.yScale(
+        currentPoint['close']
+      )})`
+    );
+
+    focus
+      .select('line.x')
+      .attr('x1', 0)
+      .attr('x2', this.width - this.xScale(currentPoint['date']))
+      .attr('y1', 0)
+      .attr('y2', 0);
+
+    focus
+      .select('line.y')
+      .attr('x1', 0)
+      .attr('x2', 0)
+      .attr('y1', 0)
+      .attr('y2', this.height - this.yScale(currentPoint['close']));
+
+    // updates the legend to display the date, open, close, high, low, and volume and selected mouseover area
+    this.updateLegends(currentPoint);
   }
 
   updateLegends(currentPoint) {
@@ -513,6 +684,13 @@ class HistoricalPriceChart {
 
   toggleClose(value) {
     if (value) {
+      if (this.zoom) {
+        d3.select('svg')
+          .transition()
+          .duration(750)
+          .call(this.zoom.transform, d3.zoomIdentity.scale(1));
+      }
+
       const line = d3
         .line()
         .x(d => this.xScale(d['date']))
@@ -521,14 +699,15 @@ class HistoricalPriceChart {
         .select('#chart')
         .select('svg')
         .select('g')
-        .selectAll('.priceChart')
+        .selectAll('.price-chart')
         .data([this.currentData]);
 
       lineSelect
         .enter()
         .append('path')
         .style('fill', 'none')
-        .attr('class', 'priceChart')
+        .attr('class', 'price-chart')
+        .attr('clip-path', 'url(#clip)')
         .attr('stroke', 'steelblue')
         .attr('stroke-width', '1.5')
         .attr('d', line);
@@ -540,12 +719,18 @@ class HistoricalPriceChart {
         .attr('d', line);
     } else {
       // Remove close price chart
-      d3.select('.priceChart').remove();
+      d3.select('.price-chart').remove();
     }
   }
 
   toggleMovingAverage(value) {
     if (value) {
+      if (this.zoom) {
+        d3.select('svg')
+          .transition()
+          .duration(750)
+          .call(this.zoom.transform, d3.zoomIdentity.scale(1));
+      }
       // calculates simple moving average over 50 days
       const movingAverageData = this.movingAverage(this.currentData, 49);
 
@@ -558,14 +743,15 @@ class HistoricalPriceChart {
         .select('#chart')
         .select('svg')
         .select('g')
-        .selectAll('.movingAverageLine')
+        .selectAll('.moving-average-line')
         .data([movingAverageData]);
 
       movingAverageSelect
         .enter()
         .append('path')
         .style('fill', 'none')
-        .attr('class', 'movingAverageLine')
+        .attr('class', 'moving-average-line')
+        .attr('clip-path', 'url(#clip)')
         .attr('stroke', '#FF8900')
         .attr('stroke-width', '1.5')
         .attr('d', movingAverageLine);
@@ -577,12 +763,17 @@ class HistoricalPriceChart {
         .attr('d', movingAverageLine);
     } else {
       // Remove moving average line
-      d3.select('.movingAverageLine').remove();
+      d3.select('.moving-average-line').remove();
     }
   }
 
   toggleOHLC(value) {
     if (value) {
+      d3.select('svg')
+        .transition()
+        .duration(750)
+        .call(this.zoom.transform, d3.zoomIdentity.scale(1));
+
       const tickWidth = 5;
       const ohlcLine = d3
         .line()
@@ -601,6 +792,7 @@ class HistoricalPriceChart {
         .enter()
         .append('g')
         .attr('class', 'ohlc')
+        .attr('clip-path', 'url(#clip)')
         .append('g')
         .attr('class', 'bars')
         .classed('up-day', d => d['close'] > d['open'])
@@ -655,15 +847,17 @@ class HistoricalPriceChart {
 
   toggleCandlesticks(value) {
     if (value) {
+      d3.select('svg')
+        .transition()
+        .duration(750)
+        .call(this.zoom.transform, d3.zoomIdentity.scale(1));
+
       const bodyWidth = 5;
       const candlesticksLine = d3
         .line()
-        .x(function(d) {
-          return d.x;
-        })
-        .y(function(d) {
-          return d.y;
-        });
+        .x(d => d['x'])
+        .y(d => d['y']);
+
       const candlesticksSelection = d3
         .select('#chart')
         .select('g')
@@ -676,6 +870,7 @@ class HistoricalPriceChart {
         .enter()
         .append('g')
         .attr('class', 'candlesticks')
+        .attr('clip-path', 'url(#clip)')
         .append('g')
         .attr('class', 'bars')
         .classed('up-day', d => d['close'] > d['open'])

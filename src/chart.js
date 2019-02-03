@@ -300,7 +300,7 @@ class HistoricalPriceChart {
       .scaleLinear()
       .domain([yMinVolume, yMaxVolume])
       .range([this.height, this.height * (3 / 4)]);
-    d3.select('#leftAxis').call(d3.axisLeft(yVolumeScale));
+    //d3.select('#leftAxis').call(d3.axisLeft(yVolumeScale));
 
     //select, followed by updating data join
     const bars = d3
@@ -773,6 +773,7 @@ class HistoricalPriceChart {
         .enter()
         .append('g')
         .attr('class', 'ohlc')
+        .attr('clip-path', 'url(#clip)')
         .append('g')
         .attr('class', 'bars')
         .classed('up-day', d => d['close'] > d['open'])
@@ -845,6 +846,7 @@ class HistoricalPriceChart {
         .enter()
         .append('g')
         .attr('class', 'candlesticks')
+        .attr('clip-path', 'url(#clip)')
         .append('g')
         .attr('class', 'bars')
         .classed('up-day', d => d['close'] > d['open'])

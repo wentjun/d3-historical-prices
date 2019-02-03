@@ -336,6 +336,7 @@ class HistoricalPriceChart {
     /* updating of crosshair */
     // select the existing crosshair, and bind new data
     const overlay = d3.select('.overlay');
+    const focus = d3.select('.focus');
 
     // remove old crosshair
     overlay.exit().remove();
@@ -353,49 +354,7 @@ class HistoricalPriceChart {
       .attr('height', this.height)
       .on('mouseover', () => focus.style('display', null))
       .on('mouseout', () => focus.style('display', 'none'))
-      .on('mousemove', generateCrosshair);
-
-    const focus = d3.select('.focus');
-    const bisectDate = d3.bisector(d => d.date).left;
-
-    const that = this;
-
-    /* Mouseover function to generate crosshair */
-    function generateCrosshair() {
-      //returns corresponding value from the domain
-      const correspondingDate = that.xScale.invert(d3.mouse(this)[0]);
-      //gets insertion point
-      const i = bisectDate(that.currentData, correspondingDate, 1);
-      const d0 = that.currentData[i - 1];
-      const d1 = that.currentData[i];
-      const currentPoint =
-        correspondingDate - d0['date'] > d1['date'] - correspondingDate
-          ? d1
-          : d0;
-      focus.attr(
-        'transform',
-        `translate(${that.xScale(currentPoint['date'])}, ${that.yScale(
-          currentPoint['close']
-        )})`
-      );
-
-      focus
-        .select('line.x')
-        .attr('x1', 0)
-        .attr('x2', that.width - that.xScale(currentPoint['date']))
-        .attr('y1', 0)
-        .attr('y2', 0);
-
-      focus
-        .select('line.y')
-        .attr('x1', 0)
-        .attr('x2', 0)
-        .attr('y1', 0)
-        .attr('y2', that.height - that.yScale(currentPoint['close']));
-
-      // updates the legend to display the date, open, close, high, low, and volume and selected mouseover area
-      that.updateLegends(currentPoint);
-    }
+      .on('mousemove', (d, i, nodes) => this.generateCrosshair(nodes[i]));
 
     /* Updating of dividends */
     // group dividend symbols, and with clip-path attribute
@@ -585,6 +544,60 @@ class HistoricalPriceChart {
             ? updatedYScale(d['open']) - updatedYScale(d['close'])
             : updatedYScale(d['close']) - updatedYScale(d['open']);
         });
+
+      const overlay = d3.select('.overlay');
+      const focus = d3.select('.focus');
+      const bisectDate = d3.bisector(d => d.date).left;
+
+      // remove old crosshair
+      overlay.exit().remove();
+
+      // enter, and update the attributes
+      overlay
+        .enter()
+        .append('g')
+        .attr('class', 'focus')
+        .style('display', 'none');
+
+      overlay
+        .attr('class', 'overlay')
+        .attr('width', this.width)
+        .attr('height', this.height)
+        .on('mouseover', () => focus.style('display', null))
+        .on('mouseout', () => focus.style('display', 'none'))
+        .on('mousemove', (d, i, nodes) => {
+          const correspondingDate = updatedXScale.invert(d3.mouse(nodes[i])[0]);
+          //gets insertion point
+          const i1 = bisectDate(this.currentData, correspondingDate, 1);
+          const d0 = this.currentData[i1 - 1];
+          const d1 = this.currentData[i1];
+          const currentPoint =
+            correspondingDate - d0['date'] > d1['date'] - correspondingDate
+              ? d1
+              : d0;
+          focus.attr(
+            'transform',
+            `translate(${updatedXScale(currentPoint['date'])}, ${updatedYScale(
+              currentPoint['close']
+            )})`
+          );
+
+          focus
+            .select('line.x')
+            .attr('x1', 0)
+            .attr('x2', this.width - updatedXScale(currentPoint['date']))
+            .attr('y1', 0)
+            .attr('y2', 0);
+
+          focus
+            .select('line.y')
+            .attr('x1', 0)
+            .attr('x2', 0)
+            .attr('y1', 0)
+            .attr('y2', this.height - updatedYScale(currentPoint['close']));
+
+          this.updateLegends(currentPoint);
+        });
     };
 
     const zoom = d3
@@ -595,6 +608,43 @@ class HistoricalPriceChart {
       .on('zoom', zoomed);
 
     d3.select('svg').call(zoom);
+  }
+
+  /* Mouseover function to generate crosshair */
+  generateCrosshair(current) {
+    //returns corresponding value from the domain
+    const focus = d3.select('.focus');
+    const bisectDate = d3.bisector(d => d.date).left;
+    const correspondingDate = this.xScale.invert(d3.mouse(current)[0]);
+    //gets insertion point
+    const i = bisectDate(this.currentData, correspondingDate, 1);
+    const d0 = this.currentData[i - 1];
+    const d1 = this.currentData[i];
+    const currentPoint =
+      correspondingDate - d0['date'] > d1['date'] - correspondingDate ? d1 : d0;
+    focus.attr(
+      'transform',
+      `translate(${this.xScale(currentPoint['date'])}, ${this.yScale(
+        currentPoint['close']
+      )})`
+    );
+
+    focus
+      .select('line.x')
+      .attr('x1', 0)
+      .attr('x2', this.width - this.xScale(currentPoint['date']))
+      .attr('y1', 0)
+      .attr('y2', 0);
+
+    focus
+      .select('line.y')
+      .attr('x1', 0)
+      .attr('x2', 0)
+      .attr('y1', 0)
+      .attr('y2', this.height - this.yScale(currentPoint['close']));
+
+    // updates the legend to display the date, open, close, high, low, and volume and selected mouseover area
+    this.updateLegends(currentPoint);
   }
 
   updateLegends(currentPoint) {

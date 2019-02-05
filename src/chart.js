@@ -256,7 +256,6 @@ class HistoricalPriceChart {
           }
         });
 
-      this.margin = { top: 50, right: 40, bottom: 50, left: 60 };
       this.width = window.innerWidth - this.margin.left - this.margin.right; // Use the window's width
       this.height = window.innerHeight - this.margin.top - this.margin.bottom; // Use the window's height
 

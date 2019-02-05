@@ -456,6 +456,10 @@ class HistoricalPriceChart {
       .checked;
     this.toggleCandlesticks(candlesticksToggle);
 
+    /* Display Candlesticks chart */
+    //const candlesticksToggle = document.querySelector('input[id=candlesticks]').checked;
+    this.toggleBollingerBands(true);
+
     /* Handle zoom and pan */
     const xAxis = d3.axisBottom(this.xScale);
     const yAxis = d3.axisRight(this.yScale);
@@ -905,6 +909,126 @@ class HistoricalPriceChart {
         .select('g')
         .selectAll('.candlesticks')
         .remove();
+    }
+  }
+
+  toggleBollingerBands(value) {
+    if (value) {
+      function standardDeviation(data, numberOfPricePoints) {
+        let sumSquaredDifference = 0;
+        return data.map((row, index, total) => {
+          const start = Math.max(0, index - numberOfPricePoints);
+          const end = index;
+          const subset = total.slice(start, end + 1);
+          const sum = subset.reduce((a, b) => {
+            return a + b['close'];
+          }, 0);
+
+          const sumSquaredDifference = subset.reduce((a, b) => {
+            const average = sum / subset.length;
+            const dfferenceFromMean = b['close'] - average;
+            const squaredDifferenceFromMean = Math.pow(dfferenceFromMean, 2);
+            return a + squaredDifferenceFromMean;
+          }, 0);
+          const variance = sumSquaredDifference / subset.length;
+
+          return {
+            date: row['date'],
+            average: sum / subset.length,
+            standardDeviation: Math.sqrt(variance),
+            upperBand: sum / subset.length + Math.sqrt(variance) * 2,
+            lowerBand: sum / subset.length - Math.sqrt(variance) * 2
+          };
+        });
+      }
+      console.log(standardDeviation(this.currentData, 19));
+      // calculates simple moving average, and standard deviation over 20 days
+      const bollingerBandsData = standardDeviation(this.currentData, 19);
+      const movingAverage = d3
+        .line()
+        .x(d => this.xScale(d['date']))
+        .y(d => this.yScale(d['average']))
+        .curve(d3.curveBasis);
+      const upperBand = d3
+        .line()
+        .x(d => this.xScale(d['date']))
+        .y(d => this.yScale(d['upperBand']))
+        .curve(d3.curveBasis);
+      const lowerBand = d3
+        .line()
+        .x(d => this.xScale(d['date']))
+        .y(d => this.yScale(d['lowerBand']))
+        .curve(d3.curveBasis);
+
+      const movingAverageSelect = d3
+        .select('#chart')
+        .select('svg')
+        .select('g')
+        .selectAll('.middle-band')
+        .data([bollingerBandsData]);
+
+      movingAverageSelect
+        .enter()
+        .append('path')
+        .style('fill', 'none')
+        .attr('class', 'middle-band')
+        .attr('clip-path', 'url(#clip)')
+        .attr('stroke', 'darkgrey')
+        .attr('stroke-width', '1.5')
+        .attr('d', movingAverage);
+
+      // Update the middle band - moving average
+      movingAverageSelect
+        .transition()
+        .duration(750)
+        .attr('d', movingAverage);
+
+      const upperBandSelect = d3
+        .select('#chart')
+        .select('svg')
+        .select('g')
+        .selectAll('.upper-band')
+        .data([bollingerBandsData]);
+
+      upperBandSelect
+        .enter()
+        .append('path')
+        .style('fill', 'none')
+        .attr('class', 'upper-band')
+        .attr('clip-path', 'url(#clip)')
+        .attr('stroke', 'darkgrey')
+        .attr('stroke-width', '1.5')
+        .attr('d', upperBand);
+
+      // Update the upper band
+      upperBandSelect
+        .transition()
+        .duration(750)
+        .attr('d', upperBand);
+
+      const lowerBandSelect = d3
+        .select('#chart')
+        .select('svg')
+        .select('g')
+        .selectAll('.lower-band')
+        .data([bollingerBandsData]);
+
+      lowerBandSelect
+        .enter()
+        .append('path')
+        .style('fill', 'none')
+        .attr('class', 'lower-band')
+        .attr('clip-path', 'url(#clip)')
+        .attr('stroke', 'darkgrey')
+        .attr('stroke-width', '1.5')
+        .attr('d', lowerBand);
+
+      // Update the lower band
+      lowerBandSelect
+        .transition()
+        .duration(750)
+        .attr('d', lowerBand);
+    } else {
     }
   }
 }

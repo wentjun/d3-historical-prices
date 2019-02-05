@@ -42,6 +42,15 @@ class HistoricalPriceChart {
         document.querySelector('input[id=candlesticks]').checked
       );
     });
+
+    const viewBollingerBands = document.querySelector(
+      'input[id=bollinger-bands]'
+    );
+    viewBollingerBands.addEventListener('change', event => {
+      this.toggleBollingerBands(
+        document.querySelector('input[id=bollinger-bands]').checked
+      );
+    });
   }
 
   loadData(selectedDataset = 'vig') {
@@ -165,7 +174,7 @@ class HistoricalPriceChart {
 
     this.yScale = d3
       .scaleLinear()
-      .domain([yMin - 5, yMax])
+      .domain([yMin - 5, yMax + 4])
       .range([this.height, 0]);
 
     // add chart SVG to the page
@@ -266,7 +275,7 @@ class HistoricalPriceChart {
       const yMax = d3.max(this.currentData, d => Math.max(d['close']));
 
       this.xScale.domain([xMin, xMax]);
-      this.yScale.domain([yMin - 5, yMax]);
+      this.yScale.domain([yMin - 5, yMax + 4]);
 
       // get dividend data for current dataset
       const dividendData = response['dividends'].filter(row => {
@@ -458,7 +467,10 @@ class HistoricalPriceChart {
 
     /* Display Candlesticks chart */
     //const candlesticksToggle = document.querySelector('input[id=candlesticks]').checked;
-    this.toggleBollingerBands(true);
+    const toggleBollingerBands = document.querySelector(
+      'input[id=bollinger-bands]'
+    ).checked;
+    this.toggleBollingerBands(toggleBollingerBands);
 
     /* Handle zoom and pan */
     const xAxis = d3.axisBottom(this.xScale);
@@ -941,9 +953,10 @@ class HistoricalPriceChart {
           };
         });
       }
-      console.log(standardDeviation(this.currentData, 19));
       // calculates simple moving average, and standard deviation over 20 days
       const bollingerBandsData = standardDeviation(this.currentData, 19);
+
+      // middle band - moving average
       const movingAverage = d3
         .line()
         .x(d => this.xScale(d['date']))
@@ -983,6 +996,7 @@ class HistoricalPriceChart {
         .duration(750)
         .attr('d', movingAverage);
 
+      // upper band
       const upperBandSelect = d3
         .select('#chart')
         .select('svg')
@@ -997,7 +1011,7 @@ class HistoricalPriceChart {
         .attr('class', 'upper-band')
         .attr('clip-path', 'url(#clip)')
         .attr('stroke', 'darkgrey')
-        .attr('stroke-width', '1.5')
+        .attr('stroke-width', '1')
         .attr('d', upperBand);
 
       // Update the upper band
@@ -1006,6 +1020,7 @@ class HistoricalPriceChart {
         .duration(750)
         .attr('d', upperBand);
 
+      // lower band
       const lowerBandSelect = d3
         .select('#chart')
         .select('svg')
@@ -1020,7 +1035,7 @@ class HistoricalPriceChart {
         .attr('class', 'lower-band')
         .attr('clip-path', 'url(#clip)')
         .attr('stroke', 'darkgrey')
-        .attr('stroke-width', '1.5')
+        .attr('stroke-width', '1')
         .attr('d', lowerBand);
 
       // Update the lower band
@@ -1028,7 +1043,40 @@ class HistoricalPriceChart {
         .transition()
         .duration(750)
         .attr('d', lowerBand);
+
+      const area = d3
+        .area()
+        .x(d => this.xScale(d['date']))
+        .y0(d => this.yScale(d['upperBand']))
+        .y1(d => this.yScale(d['lowerBand']));
+
+      const areaSelect = d3
+        .select('#chart')
+        .select('svg')
+        .select('g')
+        .selectAll('.band-area')
+        .data([bollingerBandsData]);
+
+      areaSelect
+        .enter()
+        .append('path')
+        .style('fill', 'darkgrey')
+        .style('opacity', 0.2)
+        .attr('class', 'band-area')
+        .attr('clip-path', 'url(#clip)')
+        .attr('d', area);
+
+      // Update the lower band
+      areaSelect
+        .transition()
+        .duration(750)
+        .attr('d', area);
     } else {
+      // remove candlesticks
+      d3.select('#chart')
+        .select('g')
+        .selectAll('.middle-band,.lower-band,.upper-band')
+        .remove();
     }
   }
 }

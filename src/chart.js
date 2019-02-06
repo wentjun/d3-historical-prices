@@ -1062,6 +1062,7 @@ class HistoricalPriceChart {
         .append('path')
         .style('fill', 'darkgrey')
         .style('opacity', 0.2)
+        .style('pointer-events', 'none')
         .attr('class', 'band-area')
         .attr('clip-path', 'url(#clip)')
         .attr('d', area);

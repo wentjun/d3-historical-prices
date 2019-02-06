@@ -561,6 +561,27 @@ class HistoricalPriceChart {
             : updatedYScale(d['close']) - updatedYScale(d['open']);
         });
 
+      // update bollinger Bands based on zoom/pan
+      const updateUpperBandPlot = d3
+        .line()
+        .x(d => updatedXScale(d['date']))
+        .y(d => updatedYScale(d['upperBand']));
+      const updateLowerBandPlot = d3
+        .line()
+        .x(d => updatedXScale(d['date']))
+        .y(d => updatedYScale(d['lowerBand']))
+        .curve(d3.curveBasis);
+      const area = d3
+        .area()
+        .x(d => updatedXScale(d['date']))
+        .y0(d => updatedYScale(d['upperBand']))
+        .y1(d => updatedYScale(d['lowerBand']));
+      d3.select('.upper-band').attr('d', updateUpperBandPlot);
+      d3.select('.lower-band').attr('d', updateLowerBandPlot);
+      d3.select('.middle-band').attr('d', updateMovingAverageLinePlot);
+      d3.select('.band-area').attr('d', area);
+
+      // update crosshair position on zooming/panning
       const overlay = d3.select('.overlay');
       const focus = d3.select('.focus');
       const bisectDate = d3.bisector(d => d.date).left;
@@ -1062,7 +1083,7 @@ class HistoricalPriceChart {
         .append('path')
         .style('fill', 'darkgrey')
         .style('opacity', 0.2)
-        .style('pointer-events', 'none')
+        .style('pointer-events', 'none') //allow mouseover to propagate
         .attr('class', 'band-area')
         .attr('clip-path', 'url(#clip)')
         .attr('d', area);

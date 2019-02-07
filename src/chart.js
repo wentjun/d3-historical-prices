@@ -8,7 +8,7 @@ class HistoricalPriceChart {
     this.zoom;
     this.currentData = [];
     this.bollingerBandsData = undefined;
-
+    this.movingAverageData = undefined;
     this.loadData('vig').then(data => {
       this.initialiseChart(data);
     });
@@ -635,7 +635,7 @@ class HistoricalPriceChart {
             .attr('y2', this.height - updatedYScale(currentPoint['close']));
 
           this.updateLegends(currentPoint);
-          this.updateBollingerBandsLegends(currentPoint['date']);
+          this.updateSecondaryLegends(currentPoint['date']);
         });
     };
 
@@ -684,21 +684,21 @@ class HistoricalPriceChart {
 
     // updates the legend to display the date, open, close, high, low, and volume and selected mouseover area
     this.updateLegends(currentPoint);
-    this.updateBollingerBandsLegends(currentPoint['date']);
+    this.updateSecondaryLegends(currentPoint['date']);
   }
 
   updateLegends(currentPoint) {
-    d3.selectAll('.line-legend').remove();
+    d3.selectAll('.primary-legend').remove();
 
     const legendKeys = Object.keys(currentPoint);
     const lineLegend = d3
       .select('#chart')
       .select('g')
-      .selectAll('.line-legend')
+      .selectAll('.primary-legend')
       .data(legendKeys)
       .enter()
       .append('g')
-      .attr('class', 'line-legend')
+      .attr('class', 'primary-legend')
       .attr('transform', (d, i) => `translate(0, ${i * 20})`);
     lineLegend
       .append('text')
@@ -721,27 +721,47 @@ class HistoricalPriceChart {
       .attr('transform', 'translate(15,9)'); //align texts with boxes
   }
 
-  updateBollingerBandsLegends(currentDate) {
-    if (this.bollingerBandsData) {
-      const currentPoint = this.bollingerBandsData.filter(
+  updateSecondaryLegends(currentDate) {
+    const secondaryLegend = {};
+    if (this.movingAverageData) {
+      const currentPoint = this.movingAverageData.filter(
         dataPoint => dataPoint['date'] === currentDate
-      );
-      d3.selectAll('.bollinger-bands-legend').remove();
+      )[0];
+      secondaryLegend['movingAverage'] = currentPoint;
+    }
+    if (this.bollingerBandsData) {
+      const currentBollingerBandsPoint = this.bollingerBandsData.filter(
+        dataPoint => dataPoint['date'] === currentDate
+      )[0];
+      secondaryLegend['bollingerBands'] = currentBollingerBandsPoint;
+    }
+    const secondaryLegendKeys = Object.keys(secondaryLegend);
+    d3.selectAll('.secondary-legend').remove();
 
+    if (secondaryLegendKeys.length > 0) {
       const bollingerBandsLegend = d3
         .select('#chart')
         .select('g')
-        .selectAll('.bollinger-bands-legend')
-        .data(currentPoint)
+        .selectAll('.secondary-legend')
+        .data(secondaryLegendKeys)
         .enter()
         .append('g')
-        .attr('class', 'bollinger-bands-legend');
+        .attr('class', 'secondary-legend')
+        .attr('transform', (d, i) => `translate(0, ${i * 20})`);
       bollingerBandsLegend
         .append('text')
         .text(d => {
-          return `Bollinger Bands (20, 2.0, MA): ${d['lowerBand'].toFixed(
-            2
-          )} - ${d['average'].toFixed(2)} - ${d['upperBand'].toFixed(2)}`;
+          if (d === 'movingAverage') {
+            return `Moving Average (50): ${secondaryLegend[d][
+              'average'
+            ].toFixed(2)}`;
+          } else if (d === 'bollingerBands') {
+            return `Bollinger Bands (20, 2.0, MA): ${secondaryLegend[d][
+              'lowerBand'
+            ].toFixed(2)} - ${secondaryLegend[d]['average'].toFixed(
+              2
+            )} - ${secondaryLegend[d]['upperBand'].toFixed(2)}`;
+          }
         })
         .style('font-size', '0.8em')
         .style('fill', 'white')
@@ -799,7 +819,7 @@ class HistoricalPriceChart {
           .call(this.zoom.transform, d3.zoomIdentity.scale(1));
       }
       // calculates simple moving average over 50 days
-      const movingAverageData = this.movingAverage(this.currentData, 49);
+      this.movingAverageData = this.movingAverage(this.currentData, 49);
 
       const movingAverageLine = d3
         .line()
@@ -811,7 +831,7 @@ class HistoricalPriceChart {
         .select('svg')
         .select('g')
         .selectAll('.moving-average-line')
-        .data([movingAverageData]);
+        .data([this.movingAverageData]);
 
       movingAverageSelect
         .enter()
@@ -829,6 +849,7 @@ class HistoricalPriceChart {
         .duration(750)
         .attr('d', movingAverageLine);
     } else {
+      this.movingAverageData = undefined;
       // Remove moving average line
       d3.select('.moving-average-line').remove();
     }
@@ -1130,10 +1151,13 @@ class HistoricalPriceChart {
         .duration(750)
         .attr('d', area);
     } else {
+      this.bollingerBandsData = undefined;
       // remove candlesticks
       d3.select('#chart')
         .select('g')
-        .selectAll('.middle-band, .lower-band, .upper-band, .band-area')
+        .selectAll(
+          '.middle-band, .lower-band, .upper-band, .band-area'
+        )
         .remove();
     }
   }

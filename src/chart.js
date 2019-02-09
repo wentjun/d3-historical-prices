@@ -318,14 +318,8 @@ class HistoricalPriceChart {
       .selectAll('.vol')
       .data(this.currentData, d => d['date']);
 
-    bars.exit().remove();
-
-    //enter, and merge the selections. This updates the volume series bars.
     bars
-      .enter()
-      .append('rect')
-      .attr('class', 'vol')
-      .merge(bars)
+      .join(enter => enter.append('rect').attr('class', 'vol'))
       .transition()
       .duration(750)
       .attr('x', d => this.xScale(d['date']))
@@ -385,66 +379,68 @@ class HistoricalPriceChart {
       .append('div')
       .attr('class', 'tooltip')
       .style('opacity', 0);
-
-    dividendSelect.exit().remove();
-
-    // first, enter and append the group element, with the mousemove and mouseout events
-    const dividendsEnter = dividendSelect
-      .enter()
-      .append('g')
-      .attr('class', 'dividend-group')
-      .on('mousemove', d => {
-        dividendTooltip
-          .style('opacity', 1)
-          .style('color', '#464e56')
-          .style('left', d3.event.pageX - 80 + 'px')
-          .style('top', d3.event.pageY - 50 + 'px')
-          .html(
-            `<strong>Dividends: ${d['yield']}</strong> <br/> Date: ${d[
-              'date'
-            ].toLocaleDateString()}`
-          );
-      })
-      .on('mouseout', d => {
-        dividendTooltip
-          .transition()
-          .duration(200)
-          .style('opacity', 0);
-      });
-
-    // enter and append the square symbols representing the dividends to the group element
-    dividendsEnter
-      .append('path')
-      .attr('class', 'dividend')
-      .attr(
-        'd',
-        d3
-          .symbol()
-          .size(300)
-          .type(d3.symbolSquare)
-      )
-      .style('opacity', 0.8)
-      .style('cursor', 'pointer')
-      .style('fill', '#00ced1');
-
-    // enter and append the 'D' text to the group element
-    dividendsEnter
-      .append('text')
-      .attr('x', -6)
-      .attr('y', 5)
-      .text(d => 'D')
-      .style('cursor', 'pointer')
-      .style('fill', '#464e56');
-
-    // update the group element by merging the selections, and translating the elements to their respective positions
-    dividendsEnter
-      .merge(dividendSelect)
+    const t = d3
       .transition()
-      .duration(200)
-      .attr(
-        'transform',
-        (d, i) => `translate(${this.xScale(d['date'])},${this.height - 80})`
-      );
+      .duration(4000)
+      .ease(d3.easeElastic);
+    dividendSelect.join(
+      enter => {
+        // first, enter and append the group element, with the mousemove and mouseout events
+        const s = enter
+          .append('g')
+          .attr('class', 'dividend-group')
+          .on('mousemove', d => {
+            dividendTooltip
+              .style('opacity', 1)
+              .style('color', '#464e56')
+              .style('left', d3.event.pageX - 80 + 'px')
+              .style('top', d3.event.pageY - 50 + 'px')
+              .html(
+                `<strong>Dividends: ${d['yield']}</strong> <br/> Date: ${d[
+                  'date'
+                ].toLocaleDateString()}`
+              );
+          })
+          .on('mouseout', d => {
+            dividendTooltip
+              .transition()
+              .duration(200)
+              .style('opacity', 0);
+          });
+        // enter and append the square symbols representing the dividends to the group element
+        s.append('path')
+          .attr('class', 'dividend')
+          .attr(
+            'd',
+            d3
+              .symbol()
+              .size(300)
+              .type(d3.symbolSquare)
+          )
+          .style('opacity', 0.8)
+          .style('cursor', 'pointer')
+          .style('fill', '#00ced1');
+        // enter and append the 'D' text to the group element
+        s.append('text')
+          .attr('x', -6)
+          .attr('y', 5)
+          .text(d => 'D')
+          .style('cursor', 'pointer')
+          .style('fill', '#464e56');
+        // translate the elements to their respective positions
+        s.transition()
+          .duration(200)
+          .attr(
+            'transform',
+            (d, i) => `translate(${this.xScale(d['date'])},${this.height - 80})`
+          );
+      },
+      update =>
+        update.attr(
+          'transform',
+          (d, i) => `translate(${this.xScale(d['date'])},${this.height - 80})`
+        )
+    );
 
     /* Update the price chart */
     const closeCheckboxToggle = document.querySelector('input[id=close]')
@@ -1155,9 +1151,7 @@ class HistoricalPriceChart {
       // remove candlesticks
       d3.select('#chart')
         .select('g')
-        .selectAll(
-          '.middle-band, .lower-band, .upper-band, .band-area'
-        )
+        .selectAll('.middle-band, .lower-band, .upper-band, .band-area')
         .remove();
     }
   }

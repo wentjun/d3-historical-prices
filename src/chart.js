@@ -224,13 +224,15 @@ class HistoricalPriceChart {
       .attr('width', this.width)
       .attr('height', this.height);
 
-    d3.select('.overlay').style('fill', 'none');
-    d3.select('.overlay').style('pointer-events', 'all');
+    d3.select('.overlay')
+      .style('fill', 'none')
+      .style('pointer-events', 'all');
 
-    d3.selectAll('.focus line').style('fill', 'none');
-    d3.selectAll('.focus line').style('stroke', '#67809f');
-    d3.selectAll('.focus line').style('stroke-width', '1.5px');
-    d3.selectAll('.focus line').style('stroke-dasharray', '3 3');
+    d3.selectAll('.focus line')
+      .style('fill', 'none')
+      .style('stroke', '#67809f')
+      .style('stroke-width', '1.5px')
+      .style('stroke-dasharray', '3 3');
 
     // get VIG dividend data for year of 2018
     const dividendData = data['dividends'].filter(row => {
@@ -379,14 +381,11 @@ class HistoricalPriceChart {
       .append('div')
       .attr('class', 'tooltip')
       .style('opacity', 0);
-    const t = d3
-      .transition()
-      .duration(4000)
-      .ease(d3.easeElastic);
+
     dividendSelect.join(
       enter => {
         // first, enter and append the group element, with the mousemove and mouseout events
-        const s = enter
+        const enterSelection = enter
           .append('g')
           .attr('class', 'dividend-group')
           .on('mousemove', d => {
@@ -408,7 +407,8 @@ class HistoricalPriceChart {
               .style('opacity', 0);
           });
         // enter and append the square symbols representing the dividends to the group element
-        s.append('path')
+        enterSelection
+          .append('path')
           .attr('class', 'dividend')
           .attr(
             'd',
@@ -421,14 +421,16 @@ class HistoricalPriceChart {
           .style('cursor', 'pointer')
           .style('fill', '#00ced1');
         // enter and append the 'D' text to the group element
-        s.append('text')
+        enterSelection
+          .append('text')
           .attr('x', -6)
           .attr('y', 5)
           .text(d => 'D')
           .style('cursor', 'pointer')
           .style('fill', '#464e56');
         // translate the elements to their respective positions
-        s.transition()
+        enterSelection
+          .transition()
           .duration(200)
           .attr(
             'transform',
@@ -829,21 +831,22 @@ class HistoricalPriceChart {
         .selectAll('.moving-average-line')
         .data([this.movingAverageData]);
 
-      movingAverageSelect
-        .enter()
-        .append('path')
-        .style('fill', 'none')
-        .attr('class', 'moving-average-line')
-        .attr('clip-path', 'url(#clip)')
-        .attr('stroke', '#FF8900')
-        .attr('stroke-width', '1.5')
-        .attr('d', movingAverageLine);
-
-      // Update the moving average line
-      movingAverageSelect
-        .transition()
-        .duration(750)
-        .attr('d', movingAverageLine);
+      movingAverageSelect.join(
+        enter =>
+          enter
+            .append('path')
+            .style('fill', 'none')
+            .attr('class', 'moving-average-line')
+            .attr('clip-path', 'url(#clip)')
+            .attr('stroke', '#FF8900')
+            .attr('stroke-width', '1.5')
+            .attr('d', movingAverageLine),
+        update =>
+          update
+            .transition()
+            .duration(750)
+            .attr('d', movingAverageLine)
+      );
     } else {
       this.movingAverageData = undefined;
       // Remove moving average line

@@ -252,6 +252,185 @@ class HistoricalPriceChart {
 
     // generates the rest of the graph
     this.updateChart(dividendData);
+
+    /* Handle zoom and pan */
+    this.zoom = d3
+      .zoom()
+      .scaleExtent([1, 10])
+      .translateExtent([[0, 0], [this.width, this.height]]) // pan limit
+      .extent([[0, 0], [this.width, this.height]]) // zoom limit
+      .on('zoom', (d, i, nodes) => this.zoomed(d, i, nodes));
+
+    d3.select('svg').call(this.zoom);
+  }
+
+  zoomed(d, i, nodes) {
+    const xAxis = d3.axisBottom(this.xScale);
+    const yAxis = d3.axisRight(this.yScale);
+    const ohlcLine = d3
+      .line()
+      .x(d => d['x'])
+      .y(d => d['y']);
+    const candlesticksLine = d3
+      .line()
+      .x(d => d['x'])
+      .y(d => d['y']);
+    const tickWidth = 5;
+    const bodyWidth = 5;
+    // only fire the zoomed function when an actual event is triggered, rather than on every update
+    if (d3.event.sourceEvent || d3.event.transform.k !== 1) {
+      // create new scale ojects based on zoom/pan event
+      const updatedXScale = d3.event.transform.rescaleX(this.xScale);
+      const updatedYScale = d3.event.transform.rescaleY(this.yScale);
+      // update axes
+      this.xAxis.call(xAxis.scale(updatedXScale));
+      this.yAxis.call(yAxis.scale(updatedYScale));
+
+      // update close price and moving average lines based on zoom/pan
+      const updateClosePriceChartPlot = d3
+        .line()
+        .x(d => updatedXScale(d['date']))
+        .y(d => updatedYScale(d['close']));
+      const updateMovingAverageLinePlot = d3
+        .line()
+        .x(d => updatedXScale(d['date']))
+        .y(d => updatedYScale(d['average']))
+        .curve(d3.curveBasis);
+
+      d3.select('.moving-average-line').attr('d', updateMovingAverageLinePlot);
+      d3.select('.price-chart').attr('d', updateClosePriceChartPlot);
+
+      // update dividends based on zoom/pan
+      d3.selectAll('.dividend-group').attr(
+        'transform',
+        (d, i) => `translate(${updatedXScale(d['date'])},${this.height - 80})`
+      );
+
+      // update volume series based on zoom/pan
+      d3.selectAll('.vol').attr('x', d => updatedXScale(d['date']));
+
+      // update ohlc series based on zoom/pan
+      d3.selectAll('.ohlc .high-low').attr('d', d => {
+        return ohlcLine([
+          { x: updatedXScale(d['date']), y: updatedYScale(d['high']) },
+          { x: updatedXScale(d['date']), y: updatedYScale(d['low']) }
+        ]);
+      });
+      d3.selectAll('.open-tick').attr('d', d => {
+        return ohlcLine([
+          {
+            x: updatedXScale(d['date']) - tickWidth,
+            y: updatedYScale(d['open'])
+          },
+          { x: updatedXScale(d['date']), y: updatedYScale(d['open']) }
+        ]);
+      });
+      d3.selectAll('.close-tick').attr('d', d => {
+        return ohlcLine([
+          { x: updatedXScale(d['date']), y: updatedYScale(d['close']) },
+          {
+            x: updatedXScale(d['date']) + tickWidth,
+            y: updatedYScale(d['close'])
+          }
+        ]);
+      });
+
+      // update candlesticks series based on zoom/pan
+      d3.selectAll('.candlesticks .high-low').attr('d', d => {
+        return candlesticksLine([
+          { x: updatedXScale(d['date']), y: updatedYScale(d['high']) },
+          { x: updatedXScale(d['date']), y: updatedYScale(d['low']) }
+        ]);
+      });
+      d3.selectAll('.candlesticks rect')
+        .attr('x', d => updatedXScale(d['date']) - bodyWidth / 2)
+        .attr('y', d => {
+          return d['close'] > d['open']
+            ? updatedYScale(d['close'])
+            : updatedYScale(d['open']);
+        })
+        .attr('height', d => {
+          return d['close'] > d['open']
+            ? updatedYScale(d['open']) - updatedYScale(d['close'])
+            : updatedYScale(d['close']) - updatedYScale(d['open']);
+        });
+
+      // update bollinger Bands based on zoom/pan
+      const updateUpperBandPlot = d3
+        .line()
+        .x(d => updatedXScale(d['date']))
+        .y(d => updatedYScale(d['upperBand']));
+      const updateLowerBandPlot = d3
+        .line()
+        .x(d => updatedXScale(d['date']))
+        .y(d => updatedYScale(d['lowerBand']))
+        .curve(d3.curveBasis);
+      const area = d3
+        .area()
+        .x(d => updatedXScale(d['date']))
+        .y0(d => updatedYScale(d['upperBand']))
+        .y1(d => updatedYScale(d['lowerBand']));
+      d3.select('.upper-band').attr('d', updateUpperBandPlot);
+      d3.select('.lower-band').attr('d', updateLowerBandPlot);
+      d3.select('.middle-band').attr('d', updateMovingAverageLinePlot);
+      d3.select('.band-area').attr('d', area);
+
+      // update crosshair position on zooming/panning
+      const overlay = d3.select('.overlay');
+      const focus = d3.select('.focus');
+      const bisectDate = d3.bisector(d => d.date).left;
+
+      // remove old crosshair
+      overlay.exit().remove();
+
+      // enter, and update the attributes
+      overlay
+        .enter()
+        .append('g')
+        .attr('class', 'focus')
+        .style('display', 'none');
+
+      overlay
+        .attr('class', 'overlay')
+        .attr('width', this.width)
+        .attr('height', this.height)
+        .on('mouseover', () => focus.style('display', null))
+        .on('mouseout', () => focus.style('display', 'none'))
+        .on('mousemove', (d, i, nodes) => {
+          const correspondingDate = updatedXScale.invert(d3.mouse(nodes[i])[0]);
+          //gets insertion point
+          const i1 = bisectDate(this.currentData, correspondingDate, 1);
+          const d0 = this.currentData[i1 - 1];
+          const d1 = this.currentData[i1];
+          const currentPoint =
+            correspondingDate - d0['date'] > d1['date'] - correspondingDate
+              ? d1
+              : d0;
+          focus.attr(
+            'transform',
+            `translate(${updatedXScale(currentPoint['date'])}, ${updatedYScale(
+              currentPoint['close']
+            )})`
+          );
+
+          focus
+            .select('line.x')
+            .attr('x1', 0)
+            .attr('x2', this.width - updatedXScale(currentPoint['date']))
+            .attr('y1', 0)
+            .attr('y2', 0);
+
+          focus
+            .select('line.y')
+            .attr('x1', 0)
+            .attr('x2', 0)
+            .attr('y1', 0)
+            .attr('y2', this.height - updatedYScale(currentPoint['close']));
+
+          this.updateLegends(currentPoint);
+          this.updateSecondaryLegends(currentPoint['date']);
+        });
+    }
   }
 
   setDataset(event) {
@@ -473,191 +652,6 @@ class HistoricalPriceChart {
       'input[id=bollinger-bands]'
     ).checked;
     this.toggleBollingerBands(toggleBollingerBands);
-
-    /* Handle zoom and pan */
-    const xAxis = d3.axisBottom(this.xScale);
-    const yAxis = d3.axisRight(this.yScale);
-    const ohlcLine = d3
-      .line()
-      .x(d => d['x'])
-      .y(d => d['y']);
-    const candlesticksLine = d3
-      .line()
-      .x(d => d['x'])
-      .y(d => d['y']);
-    const tickWidth = 5;
-    const bodyWidth = 5;
-
-    const zoomed = () => {
-      // only fire the zoomed function when an actual event is triggered, rather than on update
-      if (d3.event.sourceEvent) {
-        // create new scale ojects based on zoom/pan event
-        var updatedXScale = d3.event.transform.rescaleX(this.xScale);
-        var updatedYScale = d3.event.transform.rescaleY(this.yScale);
-        // update axes
-        this.xAxis.call(xAxis.scale(updatedXScale));
-        this.yAxis.call(yAxis.scale(updatedYScale));
-
-        // update close price and moving average lines based on zoom/pan
-        const updateClosePriceChartPlot = d3
-          .line()
-          .x(d => updatedXScale(d['date']))
-          .y(d => updatedYScale(d['close']));
-        const updateMovingAverageLinePlot = d3
-          .line()
-          .x(d => updatedXScale(d['date']))
-          .y(d => updatedYScale(d['average']))
-          .curve(d3.curveBasis);
-
-        d3.select('.moving-average-line').attr(
-          'd',
-          updateMovingAverageLinePlot
-        );
-        d3.select('.price-chart').attr('d', updateClosePriceChartPlot);
-
-        // update dividends based on zoom/pan
-        d3.selectAll('.dividend-group').attr(
-          'transform',
-          (d, i) => `translate(${updatedXScale(d['date'])},${this.height - 80})`
-        );
-
-        // update volume series based on zoom/pan
-        d3.selectAll('.vol').attr('x', d => updatedXScale(d['date']));
-
-        // update ohlc series based on zoom/pan
-        d3.selectAll('.ohlc .high-low').attr('d', d => {
-          return ohlcLine([
-            { x: updatedXScale(d['date']), y: updatedYScale(d['high']) },
-            { x: updatedXScale(d['date']), y: updatedYScale(d['low']) }
-          ]);
-        });
-        d3.selectAll('.open-tick').attr('d', d => {
-          return ohlcLine([
-            {
-              x: updatedXScale(d['date']) - tickWidth,
-              y: updatedYScale(d['open'])
-            },
-            { x: updatedXScale(d['date']), y: updatedYScale(d['open']) }
-          ]);
-        });
-        d3.selectAll('.close-tick').attr('d', d => {
-          return ohlcLine([
-            { x: updatedXScale(d['date']), y: updatedYScale(d['close']) },
-            {
-              x: updatedXScale(d['date']) + tickWidth,
-              y: updatedYScale(d['close'])
-            }
-          ]);
-        });
-
-        // update candlesticks series based on zoom/pan
-        d3.selectAll('.candlesticks .high-low').attr('d', d => {
-          return candlesticksLine([
-            { x: updatedXScale(d['date']), y: updatedYScale(d['high']) },
-            { x: updatedXScale(d['date']), y: updatedYScale(d['low']) }
-          ]);
-        });
-        d3.selectAll('.candlesticks rect')
-          .attr('x', d => updatedXScale(d['date']) - bodyWidth / 2)
-          .attr('y', d => {
-            return d['close'] > d['open']
-              ? updatedYScale(d['close'])
-              : updatedYScale(d['open']);
-          })
-          .attr('height', d => {
-            return d['close'] > d['open']
-              ? updatedYScale(d['open']) - updatedYScale(d['close'])
-              : updatedYScale(d['close']) - updatedYScale(d['open']);
-          });
-
-        // update bollinger Bands based on zoom/pan
-        const updateUpperBandPlot = d3
-          .line()
-          .x(d => updatedXScale(d['date']))
-          .y(d => updatedYScale(d['upperBand']));
-        const updateLowerBandPlot = d3
-          .line()
-          .x(d => updatedXScale(d['date']))
-          .y(d => updatedYScale(d['lowerBand']))
-          .curve(d3.curveBasis);
-        const area = d3
-          .area()
-          .x(d => updatedXScale(d['date']))
-          .y0(d => updatedYScale(d['upperBand']))
-          .y1(d => updatedYScale(d['lowerBand']));
-        d3.select('.upper-band').attr('d', updateUpperBandPlot);
-        d3.select('.lower-band').attr('d', updateLowerBandPlot);
-        d3.select('.middle-band').attr('d', updateMovingAverageLinePlot);
-        d3.select('.band-area').attr('d', area);
-
-        // update crosshair position on zooming/panning
-        const overlay = d3.select('.overlay');
-        const focus = d3.select('.focus');
-        const bisectDate = d3.bisector(d => d.date).left;
-
-        // remove old crosshair
-        overlay.exit().remove();
-
-        // enter, and update the attributes
-        overlay
-          .enter()
-          .append('g')
-          .attr('class', 'focus')
-          .style('display', 'none');
-
-        overlay
-          .attr('class', 'overlay')
-          .attr('width', this.width)
-          .attr('height', this.height)
-          .on('mouseover', () => focus.style('display', null))
-          .on('mouseout', () => focus.style('display', 'none'))
-          .on('mousemove', (d, i, nodes) => {
-            const correspondingDate = updatedXScale.invert(
-              d3.mouse(nodes[i])[0]
-            );
-            //gets insertion point
-            const i1 = bisectDate(this.currentData, correspondingDate, 1);
-            const d0 = this.currentData[i1 - 1];
-            const d1 = this.currentData[i1];
-            const currentPoint =
-              correspondingDate - d0['date'] > d1['date'] - correspondingDate
-                ? d1
-                : d0;
-            focus.attr(
-              'transform',
-              `translate(${updatedXScale(
-                currentPoint['date']
-              )}, ${updatedYScale(currentPoint['close'])})`
-            );
-
-            focus
-              .select('line.x')
-              .attr('x1', 0)
-              .attr('x2', this.width - updatedXScale(currentPoint['date']))
-              .attr('y1', 0)
-              .attr('y2', 0);
-
-            focus
-              .select('line.y')
-              .attr('x1', 0)
-              .attr('x2', 0)
-              .attr('y1', 0)
-              .attr('y2', this.height - updatedYScale(currentPoint['close']));
-
-            this.updateLegends(currentPoint);
-            this.updateSecondaryLegends(currentPoint['date']);
-          });
-      }
-    };
-
-    this.zoom = d3
-      .zoom()
-      .scaleExtent([1, 10])
-      .translateExtent([[0, 0], [this.width, this.height]]) // pan limit
-      .extent([[0, 0], [this.width, this.height]]) // zoom limit
-      .on('zoom', zoomed);
-
-    d3.select('svg').call(this.zoom);
   }
 
   /* Mouseover function to generate crosshair */
@@ -887,56 +881,49 @@ class HistoricalPriceChart {
         .selectAll('.ohlc')
         .data(this.currentData, d => d['volume']);
 
-      ohlcSelection.exit().remove();
-
-      const ohlcEnter = ohlcSelection
-        .enter()
-        .append('g')
-        .attr('class', 'ohlc')
-        .attr('clip-path', 'url(#clip)')
-        .append('g')
-        .attr('class', 'bars')
-        .classed('up-day', d => d['close'] > d['open'])
-        .classed('down-day', d => d['close'] <= d['open']);
-
-      // intraday range represented by vertical line
-      ohlcEnter
-        .append('path')
-        .classed('high-low', true)
-        .attr('d', d => {
-          return ohlcLine([
-            { x: this.xScale(d['date']), y: this.yScale(d['high']) },
-            { x: this.xScale(d['date']), y: this.yScale(d['low']) }
-          ]);
-        });
-
-      // open price represented by left horizontal line
-      ohlcEnter
-        .append('path')
-        .classed('open-tick', true)
-        .attr('d', d => {
-          return ohlcLine([
-            {
-              x: this.xScale(d['date']) - tickWidth,
-              y: this.yScale(d['open'])
-            },
-            { x: this.xScale(d['date']), y: this.yScale(d['open']) }
-          ]);
-        });
-
-      // close price represented by right horizontal line
-      ohlcEnter
-        .append('path')
-        .classed('close-tick', true)
-        .attr('d', d => {
-          return ohlcLine([
-            { x: this.xScale(d['date']), y: this.yScale(d['close']) },
-            {
-              x: this.xScale(d['date']) + tickWidth,
-              y: this.yScale(d['close'])
-            }
-          ]);
-        });
+      ohlcSelection.join(enter => {
+        const ohlcEnter = enter
+          .append('g')
+          .attr('class', 'ohlc')
+          .attr('clip-path', 'url(#clip)')
+          .append('g')
+          .attr('class', 'bars')
+          .classed('up-day', d => d['close'] > d['open'])
+          .classed('down-day', d => d['close'] <= d['open']);
+        ohlcEnter
+          .append('path')
+          .classed('high-low', true)
+          .attr('d', d => {
+            return ohlcLine([
+              { x: this.xScale(d['date']), y: this.yScale(d['high']) },
+              { x: this.xScale(d['date']), y: this.yScale(d['low']) }
+            ]);
+          });
+        ohlcEnter
+          .append('path')
+          .classed('open-tick', true)
+          .attr('d', d => {
+            return ohlcLine([
+              {
+                x: this.xScale(d['date']) - tickWidth,
+                y: this.yScale(d['open'])
+              },
+              { x: this.xScale(d['date']), y: this.yScale(d['open']) }
+            ]);
+          });
+        ohlcEnter
+          .append('path')
+          .classed('close-tick', true)
+          .attr('d', d => {
+            return ohlcLine([
+              { x: this.xScale(d['date']), y: this.yScale(d['close']) },
+              {
+                x: this.xScale(d['date']) + tickWidth,
+                y: this.yScale(d['close'])
+              }
+            ]);
+          });
+      });
     } else {
       // remove OHLC
       d3.select('#chart')
@@ -965,42 +952,39 @@ class HistoricalPriceChart {
         .selectAll('.candlesticks')
         .data(this.currentData, d => d['volume']);
 
-      candlesticksSelection.exit().remove();
-
-      const candlesticksEnter = candlesticksSelection
-        .enter()
-        .append('g')
-        .attr('class', 'candlesticks')
-        .attr('clip-path', 'url(#clip)')
-        .append('g')
-        .attr('class', 'bars')
-        .classed('up-day', d => d['close'] > d['open'])
-        .classed('down-day', d => d['close'] <= d['open']);
-
-      candlesticksEnter
-        .append('path')
-        .classed('high-low', true)
-        .attr('d', d => {
-          return candlesticksLine([
-            { x: this.xScale(d['date']), y: this.yScale(d['high']) },
-            { x: this.xScale(d['date']), y: this.yScale(d['low']) }
-          ]);
-        });
-
-      candlesticksEnter
-        .append('rect')
-        .attr('x', d => this.xScale(d.date) - bodyWidth / 2)
-        .attr('y', d => {
-          return d['close'] > d['open']
-            ? this.yScale(d.close)
-            : this.yScale(d.open);
-        })
-        .attr('width', bodyWidth)
-        .attr('height', d => {
-          return d['close'] > d['open']
-            ? this.yScale(d.open) - this.yScale(d.close)
-            : this.yScale(d.close) - this.yScale(d.open);
-        });
+      candlesticksSelection.join(enter => {
+        const candlesticksEnter = enter
+          .append('g')
+          .attr('class', 'candlesticks')
+          .attr('clip-path', 'url(#clip)')
+          .append('g')
+          .attr('class', 'bars')
+          .classed('up-day', d => d['close'] > d['open'])
+          .classed('down-day', d => d['close'] <= d['open']);
+        candlesticksEnter
+          .append('path')
+          .classed('high-low', true)
+          .attr('d', d => {
+            return candlesticksLine([
+              { x: this.xScale(d['date']), y: this.yScale(d['high']) },
+              { x: this.xScale(d['date']), y: this.yScale(d['low']) }
+            ]);
+          });
+        candlesticksEnter
+          .append('rect')
+          .attr('x', d => this.xScale(d.date) - bodyWidth / 2)
+          .attr('y', d => {
+            return d['close'] > d['open']
+              ? this.yScale(d.close)
+              : this.yScale(d.open);
+          })
+          .attr('width', bodyWidth)
+          .attr('height', d => {
+            return d['close'] > d['open']
+              ? this.yScale(d.open) - this.yScale(d.close)
+              : this.yScale(d.close) - this.yScale(d.open);
+          });
+      });
     } else {
       // remove candlesticks
       d3.select('#chart')

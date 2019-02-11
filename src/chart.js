@@ -147,7 +147,6 @@ class HistoricalPriceChart {
     const thisYearStartDate = new Date(2018, 0, 1);
     const nextYearStartDate = new Date(2019, 0, 1);
     // filter out data based on time period
-    console.log(data);
     this.currentData = data['quote']
       .filter(row => row['high'] && row['low'] && row['close'] && row['open'])
       .filter(row => {
@@ -507,24 +506,44 @@ class HistoricalPriceChart {
       .selectAll('.vol')
       .data(this.currentData, d => d['date']);
 
-    bars
-      .join(enter => enter.append('rect').attr('class', 'vol'))
-      .transition()
-      .duration(750)
-      .attr('x', d => this.xScale(d['date']))
-      .attr('y', d => yVolumeScale(d['volume']))
-      .attr('fill', (d, i) => {
-        if (i === 0) {
-          return '#03a678';
-        } else {
-          // green bar if price is rising during that period, and red when price is falling
-          return this.currentData[i - 1].close > d.close
-            ? '#c0392b'
-            : '#03a678';
-        }
-      })
-      .attr('width', 1)
-      .attr('height', d => this.height - yVolumeScale(d['volume']));
+    bars.join(
+      enter =>
+        enter
+          .append('rect')
+          .attr('class', 'vol')
+          .attr('x', d => this.xScale(d['date']))
+          .attr('y', d => yVolumeScale(d['volume']))
+          .attr('fill', (d, i) => {
+            if (i === 0) {
+              return '#03a678';
+            } else {
+              // green bar if price is rising during that period, and red when price is falling
+              return this.currentData[i - 1].close > d.close
+                ? '#c0392b'
+                : '#03a678';
+            }
+          })
+          .attr('width', 1)
+          .attr('height', d => this.height - yVolumeScale(d['volume'])),
+      update =>
+        update
+          .transition()
+          .duration(750)
+          .attr('x', d => this.xScale(d['date']))
+          .attr('y', d => yVolumeScale(d['volume']))
+          .attr('fill', (d, i) => {
+            if (i === 0) {
+              return '#03a678';
+            } else {
+              // green bar if price is rising during that period, and red when price is falling
+              return this.currentData[i - 1].close > d.close
+                ? '#c0392b'
+                : '#03a678';
+            }
+          })
+          .attr('width', 1)
+          .attr('height', d => this.height - yVolumeScale(d['volume']))
+    );
 
     /* updating of crosshair */
     // select the existing crosshair, and bind new data
@@ -1010,7 +1029,7 @@ class HistoricalPriceChart {
         .duration(750)
         .call(this.zoom.transform, d3.zoomIdentity.scale(1));
 
-      function standardDeviation(data, numberOfPricePoints) {
+      const standardDeviation = (data, numberOfPricePoints) => {
         let sumSquaredDifference = 0;
         return data.map((row, index, total) => {
           const start = Math.max(0, index - numberOfPricePoints);
@@ -1036,7 +1055,7 @@ class HistoricalPriceChart {
             lowerBand: sum / subset.length - Math.sqrt(variance) * 2
           };
         });
-      }
+      };
       // calculates simple moving average, and standard deviation over 20 days
       this.bollingerBandsData = standardDeviation(this.currentData, 19);
 

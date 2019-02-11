@@ -145,14 +145,15 @@ class HistoricalPriceChart {
 
   initialiseChart(data) {
     const thisYearStartDate = new Date(2018, 0, 1);
-    const thisYearEndDate = new Date(2018, 11, 31);
+    const nextYearStartDate = new Date(2019, 0, 1);
     // filter out data based on time period
+    console.log(data);
     this.currentData = data['quote']
       .filter(row => row['high'] && row['low'] && row['close'] && row['open'])
       .filter(row => {
         if (row['date']) {
           return (
-            row['date'] >= thisYearStartDate && row['date'] <= thisYearEndDate
+            row['date'] >= thisYearStartDate && row['date'] < nextYearStartDate
           );
         }
       });
@@ -238,7 +239,7 @@ class HistoricalPriceChart {
     const dividendData = data['dividends'].filter(row => {
       if (row['date']) {
         return (
-          row['date'] >= thisYearStartDate && row['date'] <= thisYearEndDate
+          row['date'] >= thisYearStartDate && row['date'] < nextYearStartDate
         );
       }
     });
@@ -283,9 +284,15 @@ class HistoricalPriceChart {
       const updatedXScale = d3.event.transform.rescaleX(this.xScale);
       const updatedYScale = d3.event.transform.rescaleY(this.yScale);
       // update axes
-      this.xAxis.call(xAxis.scale(updatedXScale));
+      const xMin = d3.min(this.currentData, d => d['date']);
+      const xMax = d3.max(this.currentData, d => d['date']);
+      const xRescale = d3
+        .scaleTime()
+        .domain([xMin, xMax])
+        .range([0, this.width]);
+      this.xScale.domain(d3.event.transform.rescaleX(xRescale).domain());
       this.yAxis.call(yAxis.scale(updatedYScale));
-
+      this.xAxis.call(xAxis.scale(updatedXScale));
       // update close price and moving average lines based on zoom/pan
       const updateClosePriceChartPlot = d3
         .line()
@@ -436,13 +443,14 @@ class HistoricalPriceChart {
   setDataset(event) {
     this.loadData(event.target.value).then(response => {
       const thisYearStartDate = new Date(2018, 0, 1);
-      const thisYearEndDate = new Date(2018, 11, 31);
+      const nextYearStartDate = new Date(2019, 0, 1);
       this.currentData = response['quote']
         .filter(row => row['high'] && row['low'] && row['close'] && row['open'])
         .filter(row => {
           if (row['date']) {
             return (
-              row['date'] >= thisYearStartDate && row['date'] <= thisYearEndDate
+              row['date'] >= thisYearStartDate &&
+              row['date'] < nextYearStartDate
             );
           }
         });
@@ -463,7 +471,7 @@ class HistoricalPriceChart {
       const dividendData = response['dividends'].filter(row => {
         if (row['date']) {
           return (
-            row['date'] >= thisYearStartDate && row['date'] <= thisYearEndDate
+            row['date'] >= thisYearStartDate && row['date'] < nextYearStartDate
           );
         }
       });
@@ -606,6 +614,7 @@ class HistoricalPriceChart {
           .attr('y', 5)
           .text(d => 'D')
           .style('cursor', 'pointer')
+          .style('pointer-events', 'none') //allow mouseover to propagate
           .style('fill', '#464e56');
         // translate the elements to their respective positions
         enterSelection

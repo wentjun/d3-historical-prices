@@ -637,8 +637,6 @@ class HistoricalPriceChart {
           .style('fill', '#464e56');
         // translate the elements to their respective positions
         enterSelection
-          .transition()
-          .duration(200)
           .attr(
             'transform',
             (d, i) => `translate(${this.xScale(d['date'])},${this.height - 80})`

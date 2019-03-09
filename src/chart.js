@@ -7,6 +7,7 @@ class HistoricalPriceChart {
     this.yscale;
     this.zoom;
     this.currentData = [];
+    this.dividendData = [];
     this.bollingerBandsData = undefined;
     this.movingAverageData = undefined;
     this.loadData('vig').then(data => {
@@ -89,7 +90,7 @@ class HistoricalPriceChart {
     });
   }
 
-  movingAverage(data, numberOfPricePoints) {
+  calculateMovingAverage(data, numberOfPricePoints) {
     return data.map((row, index, total) => {
       const start = Math.max(0, index - numberOfPricePoints);
       //const end = index + numberOfPricePoints;
@@ -106,56 +107,53 @@ class HistoricalPriceChart {
     });
   }
 
-  // credits: https://brendansudol.com/writing/responsive-d3
-  responsivefy(svg) {
-    // get container + svg aspect ratio
-    const container = d3.select(svg.node().parentNode),
-      width = parseInt(svg.style('width')),
-      height = parseInt(svg.style('height')),
-      aspect = width / height;
+  calculateBollingerBands(data, numberOfPricePoints) {
+    let sumSquaredDifference = 0;
+    return data.map((row, index, total) => {
+      const start = Math.max(0, index - numberOfPricePoints);
+      const end = index;
+      const subset = total.slice(start, end + 1);
+      const sum = subset.reduce((a, b) => {
+        return a + b['close'];
+      }, 0);
 
-    // get width of container and resize svg to fit it
-    const resize = () => {
-      var targetWidth = parseInt(container.style('width'));
-      var targetHeight = parseInt(container.style('height'));
-      var targetAspect = targetWidth / targetHeight;
-      /*
-      if (this) {
-        this.width = targetWidth;
-        this.height = Math.round(targetWidth / targetAspect);
-      }
-      */
-      svg.attr('width', targetWidth);
-      svg.attr('height', Math.round(targetWidth / targetAspect));
-    };
+      const sumSquaredDifference = subset.reduce((a, b) => {
+        const average = sum / subset.length;
+        const dfferenceFromMean = b['close'] - average;
+        const squaredDifferenceFromMean = Math.pow(dfferenceFromMean, 2);
+        return a + squaredDifferenceFromMean;
+      }, 0);
+      const variance = sumSquaredDifference / subset.length;
 
-    // add viewBox and preserveAspectRatio properties,
-    // and call resize so that svg resizes on inital page load
-    svg
-      .attr('viewBox', '0 0 ' + width + ' ' + height)
-      .attr('perserveAspectRatio', 'xMinYMid')
-      .call(resize);
-
-    // to register multiple listeners for same event type,
-    // you need to add namespace, i.e., 'click.foo'
-    // necessary if you call invoke this function for multiple svgs
-    // api docs: https://github.com/mbostock/d3/wiki/Selections#on
-    d3.select(window).on('resize.' + container.attr('id'), resize);
+      return {
+        date: row['date'],
+        average: sum / subset.length,
+        standardDeviation: Math.sqrt(variance),
+        upperBand: sum / subset.length + Math.sqrt(variance) * 2,
+        lowerBand: sum / subset.length - Math.sqrt(variance) * 2
+      };
+    });
   }
 
   initialiseChart(data) {
-    const thisYearStartDate = new Date(2018, 0, 1);
+    const thisYearStartDate = new Date(2017, 11, 31);
     const nextYearStartDate = new Date(2019, 0, 1);
+    // remove invalid data points
+    const validData = data['quote'].filter(
+      row => row['high'] && row['low'] && row['close'] && row['open']
+    );
     // filter out data based on time period
-    this.currentData = data['quote']
-      .filter(row => row['high'] && row['low'] && row['close'] && row['open'])
-      .filter(row => {
-        if (row['date']) {
-          return (
-            row['date'] >= thisYearStartDate && row['date'] < nextYearStartDate
-          );
-        }
-      });
+    this.currentData = validData.filter(row => {
+      if (row['date']) {
+        return (
+          row['date'] >= thisYearStartDate && row['date'] < nextYearStartDate
+        );
+      }
+    });
+    // calculates simple moving average over 50 days
+    this.movingAverageData = this.calculateMovingAverage(validData, 49);
+    // calculates simple moving average, and standard deviation over 20 days
+    this.bollingerBandsData = this.calculateBollingerBands(validData, 19);
 
     this.margin = { top: 50, right: 50, bottom: 50, left: 20 };
     this.width = window.innerWidth - this.margin.left - this.margin.right; // Use the window's width
@@ -184,7 +182,6 @@ class HistoricalPriceChart {
       .append('svg')
       .attr('width', this.width + this.margin['left'] + this.margin['right'])
       .attr('height', this.height + this.margin['top'] + this.margin['bottom'])
-      //.call(this.responsivefy)
       .append('g')
       .attr(
         'transform',
@@ -235,7 +232,7 @@ class HistoricalPriceChart {
       .style('stroke-dasharray', '3 3');
 
     // get VIG dividend data for year of 2018
-    const dividendData = data['dividends'].filter(row => {
+    this.dividendData = data['dividends'].filter(row => {
       if (row['date']) {
         return (
           row['date'] >= thisYearStartDate && row['date'] < nextYearStartDate
@@ -250,8 +247,32 @@ class HistoricalPriceChart {
       .attr('width', this.width)
       .attr('height', this.height);
 
+    // group volume series bar charts, and with clip-path attribute
+    svg
+      .append('g')
+      .attr('id', 'volume-series')
+      .attr('clip-path', 'url(#clip)');
+
+    // group dividend symbols, and with clip-path attribute
+    svg
+      .append('g')
+      .attr('id', 'dividends')
+      .attr('clip-path', 'url(#clip)');
+
+    // candlesticks, and with clip-path attribute
+    svg
+      .append('g')
+      .attr('id', 'candlesticks-series')
+      .attr('clip-path', 'url(#clip)');
+
+    // ohlc, and with clip-path attribute
+    svg
+      .append('g')
+      .attr('id', 'ohlc-series')
+      .attr('clip-path', 'url(#clip)');
+
     // generates the rest of the graph
-    this.updateChart(dividendData);
+    this.updateChart();
 
     /* Handle zoom and pan */
     this.zoom = d3
@@ -342,13 +363,13 @@ class HistoricalPriceChart {
       });
 
       // update candlesticks series based on zoom/pan
-      d3.selectAll('.candlesticks .high-low').attr('d', d => {
+      d3.selectAll('.candlestick .high-low').attr('d', d => {
         return candlesticksLine([
           { x: updatedXScale(d['date']), y: updatedYScale(d['high']) },
           { x: updatedXScale(d['date']), y: updatedYScale(d['low']) }
         ]);
       });
-      d3.selectAll('.candlesticks rect')
+      d3.selectAll('.candlestick rect')
         .attr('x', d => updatedXScale(d['date']) - bodyWidth / 2)
         .attr('y', d => {
           return d['close'] > d['open']
@@ -441,19 +462,25 @@ class HistoricalPriceChart {
 
   setDataset(event) {
     this.loadData(event.target.value).then(response => {
-      const thisYearStartDate = new Date(2018, 0, 1);
+      const thisYearStartDate = new Date(2017, 11, 31);
       const nextYearStartDate = new Date(2019, 0, 1);
-      this.currentData = response['quote']
-        .filter(row => row['high'] && row['low'] && row['close'] && row['open'])
-        .filter(row => {
-          if (row['date']) {
-            return (
-              row['date'] >= thisYearStartDate &&
-              row['date'] < nextYearStartDate
-            );
-          }
-        });
+      // remove invalid data points
+      const validData = response['quote'].filter(
+        row => row['high'] && row['low'] && row['close'] && row['open']
+      );
 
+      this.currentData = validData.filter(row => {
+        if (row['date']) {
+          return (
+            row['date'] >= thisYearStartDate && row['date'] < nextYearStartDate
+          );
+        }
+      });
+
+      this.movingAverageData = this.calculateMovingAverage(validData, 49);
+      this.bollingerBandsData = this.calculateBollingerBands(validData, 19);
+
+      this.margin = { top: 50, right: 50, bottom: 50, left: 20 };
       this.width = window.innerWidth - this.margin.left - this.margin.right; // Use the window's width
       this.height = window.innerHeight - this.margin.top - this.margin.bottom; // Use the window's height
 
@@ -467,7 +494,7 @@ class HistoricalPriceChart {
       this.yScale.domain([yMin - 5, yMax + 4]);
 
       // get dividend data for current dataset
-      const dividendData = response['dividends'].filter(row => {
+      this.dividendData = response['dividends'].filter(row => {
         if (row['date']) {
           return (
             row['date'] >= thisYearStartDate && row['date'] < nextYearStartDate
@@ -475,24 +502,206 @@ class HistoricalPriceChart {
         }
       });
 
-      this.updateChart(dividendData);
+      this.updateChart();
     });
   }
 
-  updateChart(dividendData) {
-    /* Update the axis */
+  updateChart() {
+    /* Update the axes */
     d3.select('.xAxis').call(d3.axisBottom(this.xScale));
     d3.select('.yAxis').call(d3.axisRight(this.yScale));
 
-    /* Update the volume series */
+    /* updating of crosshair */
+    this.updateCrosshairProperties();
+
+    /* Update the volume series bar chart */
+    this.renderVolumeBarCharts();
+
+    /* Update dividend indicators */
+    this.renderDividendIndicators();
+
+    /* Update the price chart */
+    const closeCheckboxToggle = document.querySelector('input[id=close]')
+      .checked;
+    this.toggleClose(closeCheckboxToggle);
+
+    /* Update the moving average line */
+    const movingAverageCheckboxToggle = document.querySelector(
+      'input[id=moving-average]'
+    ).checked;
+    this.toggleMovingAverage(movingAverageCheckboxToggle);
+
+    /* Display OHLC chart */
+    const checkboxToggle = document.querySelector('input[id=ohlc]').checked;
+    this.toggleOHLC(checkboxToggle);
+
+    /* Display Candlesticks chart */
+    const candlesticksToggle = document.querySelector('input[id=candlesticks]')
+      .checked;
+    this.toggleCandlesticks(candlesticksToggle);
+
+    /* Display Bollinger Bands */
+    const toggleBollingerBands = document.querySelector(
+      'input[id=bollinger-bands]'
+    ).checked;
+    this.toggleBollingerBands(toggleBollingerBands);
+  }
+
+  /* Mouseover function to generate crosshair */
+  generateCrosshair(current) {
+    //returns corresponding value from the domain
+    const focus = d3.select('.focus');
+    const bisectDate = d3.bisector(d => d.date).left;
+    const correspondingDate = this.xScale.invert(d3.mouse(current)[0]);
+    //gets insertion point
+    const i = bisectDate(this.currentData, correspondingDate, 1);
+    const d0 = this.currentData[i - 1];
+    const d1 = this.currentData[i];
+    const currentPoint =
+      correspondingDate - d0['date'] > d1['date'] - correspondingDate ? d1 : d0;
+    focus.attr(
+      'transform',
+      `translate(${this.xScale(currentPoint['date'])}, ${this.yScale(
+        currentPoint['close']
+      )})`
+    );
+
+    focus
+      .select('line.x')
+      .attr('x1', 0)
+      .attr('x2', this.width - this.xScale(currentPoint['date']))
+      .attr('y1', 0)
+      .attr('y2', 0);
+
+    focus
+      .select('line.y')
+      .attr('x1', 0)
+      .attr('x2', 0)
+      .attr('y1', 0)
+      .attr('y2', this.height - this.yScale(currentPoint['close']));
+
+    // updates the legend to display the date, open, close, high, low, and volume and selected mouseover area
+    this.updateLegends(currentPoint);
+    // secondary legends showing moving average and bollinger bands values
+    this.updateSecondaryLegends(currentPoint['date']);
+  }
+
+  updateLegends(currentPoint) {
+    d3.selectAll('.primary-legend').remove();
+    const legendKeys = Object.keys(currentPoint);
+    const lineLegendSelect = d3
+      .select('#chart')
+      .select('g')
+      .selectAll('.primary-legend')
+      .data(legendKeys);
+    lineLegendSelect.join(
+      enter =>
+        enter
+          .append('g')
+          .attr('class', 'primary-legend')
+          .attr('transform', (d, i) => `translate(0, ${i * 20})`)
+          .append('text')
+          .text(d => {
+            if (d === 'date') {
+              return `${d}: ${currentPoint[d].toLocaleDateString()}`;
+            } else if (
+              d === 'high' ||
+              d === 'low' ||
+              d === 'open' ||
+              d === 'close'
+            ) {
+              return `${d}: ${currentPoint[d].toFixed(2)}`;
+            } else {
+              return `${d}: ${currentPoint[d]}`;
+            }
+          })
+          .style('font-size', '0.8em')
+          .style('fill', 'white')
+          .attr('transform', 'translate(15,9)') //align texts with boxes*/
+    );
+  }
+
+  updateSecondaryLegends(currentDate) {
+    const secondaryLegend = {};
+
+    if (this.movingAverageData) {
+      const currentPoint = this.movingAverageData.filter(
+        dataPoint => dataPoint['date'] === currentDate
+      )[0];
+      secondaryLegend['movingAverage'] = currentPoint;
+    }
+    if (this.bollingerBandsData) {
+      const currentBollingerBandsPoint = this.bollingerBandsData.filter(
+        dataPoint => dataPoint['date'] === currentDate
+      )[0];
+      secondaryLegend['bollingerBands'] = currentBollingerBandsPoint;
+    }
+    const secondaryLegendKeys = Object.keys(secondaryLegend);
+
+    d3.selectAll('.secondary-legend').remove();
+    if (secondaryLegendKeys.length > 0) {
+      const secondaryLegendSelect = d3
+        .select('#chart')
+        .select('g')
+        .selectAll('.secondary-legend')
+        .data(secondaryLegendKeys);
+      secondaryLegendSelect.join(
+        enter =>
+          enter
+            .append('g')
+            .attr('class', 'secondary-legend')
+            .attr('transform', (d, i) => `translate(0, ${i * 20})`)
+            .append('text')
+            .text(d => {
+              if (d === 'movingAverage') {
+                return `Moving Average (50): ${secondaryLegend[d][
+                  'average'
+                ].toFixed(2)}`;
+              } else if (d === 'bollingerBands') {
+                return `Bollinger Bands (20, 2.0, MA): ${secondaryLegend[d][
+                  'lowerBand'
+                ].toFixed(2)} - ${secondaryLegend[d]['average'].toFixed(
+                  2
+                )} - ${secondaryLegend[d]['upperBand'].toFixed(2)}`;
+              }
+            })
+            .style('font-size', '0.8em')
+            .style('fill', 'white')
+            .attr('transform', 'translate(150,9)'),
+
+        exit => exit.remove()
+      );
+    }
+  }
+
+  updateCrosshairProperties() {
+    // select the existing crosshair, and bind new data
+    const overlay = d3.select('.overlay');
+    const focus = d3.select('.focus');
+
+    // remove old crosshair
+    overlay.exit().remove();
+
+    // enter, and update the attributes
+    overlay
+      .enter()
+      .append('g')
+      .attr('class', 'focus')
+      .style('display', 'none');
+
+    overlay
+      .attr('class', 'overlay')
+      .attr('width', this.width)
+      .attr('height', this.height)
+      .on('mouseover', () => focus.style('display', null))
+      .on('mouseout', () => focus.style('display', 'none'))
+      .on('mousemove', (d, i, nodes) => this.generateCrosshair(nodes[i]));
+  }
+
+  renderVolumeBarCharts() {
     const chart = d3.select('#chart').select('g');
     const yMinVolume = d3.min(this.currentData, d => Math.min(d['volume']));
     const yMaxVolume = d3.max(this.currentData, d => Math.max(d['volume']));
-
-    chart
-      .append('g')
-      .attr('id', 'volume-series')
-      .attr('clip-path', 'url(#clip)');
 
     const yVolumeScale = d3
       .scaleLinear()
@@ -500,7 +709,7 @@ class HistoricalPriceChart {
       .range([this.height, this.height * (3 / 4)]);
     //d3.select('#leftAxis').call(d3.axisLeft(yVolumeScale));
 
-    //select, followed by updating data join
+    //select, followed by join
     const bars = d3
       .select('#volume-series')
       .selectAll('.vol')
@@ -544,43 +753,16 @@ class HistoricalPriceChart {
           .attr('width', 1)
           .attr('height', d => this.height - yVolumeScale(d['volume']))
     );
+  }
 
-    /* updating of crosshair */
-    // select the existing crosshair, and bind new data
-    const overlay = d3.select('.overlay');
-    const focus = d3.select('.focus');
-
-    // remove old crosshair
-    overlay.exit().remove();
-
-    // enter, and update the attributes
-    overlay
-      .enter()
-      .append('g')
-      .attr('class', 'focus')
-      .style('display', 'none');
-
-    overlay
-      .attr('class', 'overlay')
-      .attr('width', this.width)
-      .attr('height', this.height)
-      .on('mouseover', () => focus.style('display', null))
-      .on('mouseout', () => focus.style('display', 'none'))
-      .on('mousemove', (d, i, nodes) => this.generateCrosshair(nodes[i]));
-
+  renderDividendIndicators() {
     /* Updating of dividends */
-    // group dividend symbols, and with clip-path attribute
-    d3.select('#chart')
-      .select('g')
-      .append('g')
-      .attr('id', 'dividends')
-      .attr('clip-path', 'url(#clip)');
 
     // select all dividend groups, and bind the new data
     const dividendSelect = d3
       .select('#dividends')
       .selectAll('.dividend-group')
-      .data(dividendData);
+      .data(this.dividendData);
 
     const dividendTooltip = d3
       .select('body')
@@ -636,11 +818,10 @@ class HistoricalPriceChart {
           .style('pointer-events', 'none') //allow mouseover to propagate
           .style('fill', '#464e56');
         // translate the elements to their respective positions
-        enterSelection
-          .attr(
-            'transform',
-            (d, i) => `translate(${this.xScale(d['date'])},${this.height - 80})`
-          );
+        enterSelection.attr(
+          'transform',
+          (d, i) => `translate(${this.xScale(d['date'])},${this.height - 80})`
+        );
       },
       update =>
         update
@@ -651,153 +832,6 @@ class HistoricalPriceChart {
             (d, i) => `translate(${this.xScale(d['date'])},${this.height - 80})`
           )
     );
-
-    /* Update the price chart */
-    const closeCheckboxToggle = document.querySelector('input[id=close]')
-      .checked;
-    this.toggleClose(closeCheckboxToggle);
-
-    /* Update the moving average line */
-    const movingAverageCheckboxToggle = document.querySelector(
-      'input[id=moving-average]'
-    ).checked;
-    this.toggleMovingAverage(movingAverageCheckboxToggle);
-
-    /* Display OHLC chart */
-    const checkboxToggle = document.querySelector('input[id=ohlc]').checked;
-    this.toggleOHLC(checkboxToggle);
-
-    /* Display Candlesticks chart */
-    const candlesticksToggle = document.querySelector('input[id=candlesticks]')
-      .checked;
-    this.toggleCandlesticks(candlesticksToggle);
-
-    /* Display Candlesticks chart */
-    //const candlesticksToggle = document.querySelector('input[id=candlesticks]').checked;
-    const toggleBollingerBands = document.querySelector(
-      'input[id=bollinger-bands]'
-    ).checked;
-    this.toggleBollingerBands(toggleBollingerBands);
-  }
-
-  /* Mouseover function to generate crosshair */
-  generateCrosshair(current) {
-    //returns corresponding value from the domain
-    const focus = d3.select('.focus');
-    const bisectDate = d3.bisector(d => d.date).left;
-    const correspondingDate = this.xScale.invert(d3.mouse(current)[0]);
-    //gets insertion point
-    const i = bisectDate(this.currentData, correspondingDate, 1);
-    const d0 = this.currentData[i - 1];
-    const d1 = this.currentData[i];
-    const currentPoint =
-      correspondingDate - d0['date'] > d1['date'] - correspondingDate ? d1 : d0;
-    focus.attr(
-      'transform',
-      `translate(${this.xScale(currentPoint['date'])}, ${this.yScale(
-        currentPoint['close']
-      )})`
-    );
-
-    focus
-      .select('line.x')
-      .attr('x1', 0)
-      .attr('x2', this.width - this.xScale(currentPoint['date']))
-      .attr('y1', 0)
-      .attr('y2', 0);
-
-    focus
-      .select('line.y')
-      .attr('x1', 0)
-      .attr('x2', 0)
-      .attr('y1', 0)
-      .attr('y2', this.height - this.yScale(currentPoint['close']));
-
-    // updates the legend to display the date, open, close, high, low, and volume and selected mouseover area
-    this.updateLegends(currentPoint);
-    this.updateSecondaryLegends(currentPoint['date']);
-  }
-
-  updateLegends(currentPoint) {
-    d3.selectAll('.primary-legend').remove();
-
-    const legendKeys = Object.keys(currentPoint);
-    const lineLegend = d3
-      .select('#chart')
-      .select('g')
-      .selectAll('.primary-legend')
-      .data(legendKeys)
-      .enter()
-      .append('g')
-      .attr('class', 'primary-legend')
-      .attr('transform', (d, i) => `translate(0, ${i * 20})`);
-    lineLegend
-      .append('text')
-      .text(d => {
-        if (d === 'date') {
-          return `${d}: ${currentPoint[d].toLocaleDateString()}`;
-        } else if (
-          d === 'high' ||
-          d === 'low' ||
-          d === 'open' ||
-          d === 'close'
-        ) {
-          return `${d}: ${currentPoint[d].toFixed(2)}`;
-        } else {
-          return `${d}: ${currentPoint[d]}`;
-        }
-      })
-      .style('font-size', '0.8em')
-      .style('fill', 'white')
-      .attr('transform', 'translate(15,9)'); //align texts with boxes
-  }
-
-  updateSecondaryLegends(currentDate) {
-    const secondaryLegend = {};
-    if (this.movingAverageData) {
-      const currentPoint = this.movingAverageData.filter(
-        dataPoint => dataPoint['date'] === currentDate
-      )[0];
-      secondaryLegend['movingAverage'] = currentPoint;
-    }
-    if (this.bollingerBandsData) {
-      const currentBollingerBandsPoint = this.bollingerBandsData.filter(
-        dataPoint => dataPoint['date'] === currentDate
-      )[0];
-      secondaryLegend['bollingerBands'] = currentBollingerBandsPoint;
-    }
-    const secondaryLegendKeys = Object.keys(secondaryLegend);
-    d3.selectAll('.secondary-legend').remove();
-
-    if (secondaryLegendKeys.length > 0) {
-      const bollingerBandsLegend = d3
-        .select('#chart')
-        .select('g')
-        .selectAll('.secondary-legend')
-        .data(secondaryLegendKeys)
-        .enter()
-        .append('g')
-        .attr('class', 'secondary-legend')
-        .attr('transform', (d, i) => `translate(0, ${i * 20})`);
-      bollingerBandsLegend
-        .append('text')
-        .text(d => {
-          if (d === 'movingAverage') {
-            return `Moving Average (50): ${secondaryLegend[d][
-              'average'
-            ].toFixed(2)}`;
-          } else if (d === 'bollingerBands') {
-            return `Bollinger Bands (20, 2.0, MA): ${secondaryLegend[d][
-              'lowerBand'
-            ].toFixed(2)} - ${secondaryLegend[d]['average'].toFixed(
-              2
-            )} - ${secondaryLegend[d]['upperBand'].toFixed(2)}`;
-          }
-        })
-        .style('font-size', '0.8em')
-        .style('fill', 'white')
-        .attr('transform', 'translate(150,9)');
-    }
   }
 
   toggleClose(value) {
@@ -850,8 +884,6 @@ class HistoricalPriceChart {
           .duration(750)
           .call(this.zoom.transform, d3.zoomIdentity.scale(1));
       }
-      // calculates simple moving average over 50 days
-      this.movingAverageData = this.movingAverage(this.currentData, 49);
 
       const movingAverageLine = d3
         .line()
@@ -882,7 +914,6 @@ class HistoricalPriceChart {
             .attr('d', movingAverageLine)
       );
     } else {
-      this.movingAverageData = undefined;
       // Remove moving average line
       d3.select('.moving-average-line').remove();
     }
@@ -902,8 +933,7 @@ class HistoricalPriceChart {
         .y(d => d['y']);
 
       const ohlcSelection = d3
-        .select('#chart')
-        .select('g')
+        .select('#ohlc-series')
         .selectAll('.ohlc')
         .data(this.currentData, d => d['volume']);
 
@@ -911,7 +941,6 @@ class HistoricalPriceChart {
         const ohlcEnter = enter
           .append('g')
           .attr('class', 'ohlc')
-          .attr('clip-path', 'url(#clip)')
           .append('g')
           .attr('class', 'bars')
           .classed('up-day', d => d['close'] > d['open'])
@@ -973,16 +1002,14 @@ class HistoricalPriceChart {
         .y(d => d['y']);
 
       const candlesticksSelection = d3
-        .select('#chart')
-        .select('g')
-        .selectAll('.candlesticks')
+        .select('#candlesticks-series')
+        .selectAll('.candlestick')
         .data(this.currentData, d => d['volume']);
 
       candlesticksSelection.join(enter => {
         const candlesticksEnter = enter
           .append('g')
-          .attr('class', 'candlesticks')
-          .attr('clip-path', 'url(#clip)')
+          .attr('class', 'candlestick')
           .append('g')
           .attr('class', 'bars')
           .classed('up-day', d => d['close'] > d['open'])
@@ -1015,7 +1042,7 @@ class HistoricalPriceChart {
       // remove candlesticks
       d3.select('#chart')
         .select('g')
-        .selectAll('.candlesticks')
+        .selectAll('.candlestick')
         .remove();
     }
   }
@@ -1026,36 +1053,6 @@ class HistoricalPriceChart {
         .transition()
         .duration(750)
         .call(this.zoom.transform, d3.zoomIdentity.scale(1));
-
-      const standardDeviation = (data, numberOfPricePoints) => {
-        let sumSquaredDifference = 0;
-        return data.map((row, index, total) => {
-          const start = Math.max(0, index - numberOfPricePoints);
-          const end = index;
-          const subset = total.slice(start, end + 1);
-          const sum = subset.reduce((a, b) => {
-            return a + b['close'];
-          }, 0);
-
-          const sumSquaredDifference = subset.reduce((a, b) => {
-            const average = sum / subset.length;
-            const dfferenceFromMean = b['close'] - average;
-            const squaredDifferenceFromMean = Math.pow(dfferenceFromMean, 2);
-            return a + squaredDifferenceFromMean;
-          }, 0);
-          const variance = sumSquaredDifference / subset.length;
-
-          return {
-            date: row['date'],
-            average: sum / subset.length,
-            standardDeviation: Math.sqrt(variance),
-            upperBand: sum / subset.length + Math.sqrt(variance) * 2,
-            lowerBand: sum / subset.length - Math.sqrt(variance) * 2
-          };
-        });
-      };
-      // calculates simple moving average, and standard deviation over 20 days
-      this.bollingerBandsData = standardDeviation(this.currentData, 19);
 
       const movingAverage = d3
         .line()
@@ -1178,8 +1175,7 @@ class HistoricalPriceChart {
             .attr('d', area)
       );
     } else {
-      this.bollingerBandsData = undefined;
-      // remove candlesticks
+      // remove bollinger bands
       d3.select('#chart')
         .select('g')
         .selectAll('.middle-band, .lower-band, .upper-band, .band-area')
